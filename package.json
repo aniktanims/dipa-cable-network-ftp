@@ -1,0 +1,45 @@
+{
+  "name": "movie-fetcher",
+  "version": "2.0.0",
+  "description": "DHAKA FLIX Movie Fetcher",
+  "main": "electron.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "electron .",
+    "build": "electron-builder --win portable dir"
+  },
+  "build": {
+    "appId": "com.dhakaflix.moviefetcher",
+    "productName": "DHAKA FLIX Movie Fetcher",
+    "asar": true,
+    "compression": "maximum",
+    "electronDownload": {
+      "mirror": "https://npmmirror.com/mirrors/electron/"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "portable"
+        }
+      ]
+    },
+    "portable": {
+      "artifactName": "MovieFetcher-Portable.exe"
+    },
+    "files": [
+      "electron.js",
+      "server.js",
+      "index.html",
+      "package.json"
+    ]
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "cors": "^2.8.5",
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "electron": "^28.3.3",
+    "electron-builder": "^24.13.3"
+  }
+}

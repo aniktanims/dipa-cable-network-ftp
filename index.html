@@ -1,0 +1,1362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DHAKA FLIX Movie Fetcher</title>
+<style>
+    :root {
+        --bg: #0d0f14;
+        --bg-2: #151821;
+        --bg-3: #1d212d;
+        --line: #2a2f3d;
+        --text: #eef0f5;
+        --muted: #8d93a5;
+        --accent: #e50914;
+        --accent-2: #ff3b45;
+        --gold: #f5c518;
+        --green: #2ecc71;
+        --radius: 12px;
+        --shadow: 0 12px 40px rgba(0, 0, 0, .55);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html { scrollbar-color: #3a4052 var(--bg); }
+
+    body {
+        font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+        -webkit-font-smoothing: antialiased;
+    }
+
+    button, input, select { font: inherit; color: inherit; }
+    button { cursor: pointer; border: none; background: none; }
+
+    ::-webkit-scrollbar { width: 10px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #3a4052; border-radius: 10px; }
+
+    /* ---------- Top bar ---------- */
+    .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        background: rgba(13, 15, 20, .92);
+        backdrop-filter: blur(14px);
+        border-bottom: 1px solid var(--line);
+    }
+
+    .topbar-row {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 12px 24px;
+    }
+
+    .logo {
+        font-weight: 800;
+        font-size: 1.35rem;
+        letter-spacing: .5px;
+        white-space: nowrap;
+        cursor: pointer;
+    }
+    .logo span { color: var(--accent); }
+
+    .search {
+        flex: 1;
+        max-width: 620px;
+        margin: 0 auto;
+        position: relative;
+    }
+    .search input {
+        width: 100%;
+        background: var(--bg-3);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 10px 44px 10px 42px;
+        outline: none;
+        transition: border-color .2s, background .2s;
+    }
+    .search input:focus { border-color: var(--accent); background: #232837; }
+    .search .icon { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+    .search kbd {
+        position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+        font-size: .75rem; color: var(--muted); border: 1px solid var(--line);
+        border-radius: 5px; padding: 1px 6px; pointer-events: none;
+    }
+
+    .top-actions { display: flex; align-items: center; gap: 10px; }
+
+    .pill-btn {
+        display: inline-flex; align-items: center; gap: 6px;
+        background: var(--bg-3);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 8px 14px;
+        font-size: .9rem;
+        white-space: nowrap;
+        transition: background .2s, border-color .2s;
+    }
+    .pill-btn:hover { background: #272c3b; }
+    .pill-btn.active { background: var(--accent); border-color: var(--accent); }
+
+    .status-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); display: inline-block; }
+    .status-dot.ok { background: var(--green); box-shadow: 0 0 8px var(--green); }
+    .status-dot.bad { background: var(--accent); }
+
+    /* ---------- Section / shelf rows ---------- */
+    .row-scroll {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        padding: 0 24px 12px;
+        scrollbar-width: none;
+    }
+    .row-scroll::-webkit-scrollbar { display: none; }
+
+    .group-label {
+        align-self: center;
+        font-size: .72rem;
+        text-transform: uppercase;
+        letter-spacing: 1.2px;
+        color: var(--muted);
+        padding: 0 4px 0 8px;
+        white-space: nowrap;
+    }
+    .group-label:first-child { padding-left: 0; }
+
+    .chip {
+        padding: 7px 14px;
+        border-radius: 999px;
+        background: transparent;
+        border: 1px solid var(--line);
+        color: var(--muted);
+        font-size: .88rem;
+        white-space: nowrap;
+        transition: all .15s;
+    }
+    .chip:hover { color: var(--text); border-color: #444b5e; }
+    .chip.active { background: var(--text); color: #111; border-color: var(--text); font-weight: 600; }
+
+    .shelves { padding-top: 2px; }
+    .shelves .chip { padding: 5px 12px; font-size: .83rem; }
+    .shelves .chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+    /* ---------- Toolbar ---------- */
+    main { padding: 20px 24px 60px; }
+
+    .toolbar {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 18px;
+    }
+    .toolbar h2 { font-size: 1.4rem; font-weight: 700; margin-right: 6px; }
+    .toolbar .count { color: var(--muted); font-size: .9rem; margin-right: auto; }
+
+    .toolbar select {
+        background: var(--bg-3);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 7px 14px;
+        outline: none;
+        cursor: pointer;
+    }
+
+    .toggle {
+        padding: 6px 13px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: var(--bg-3);
+        font-size: .85rem;
+        color: var(--muted);
+    }
+    .toggle.on { color: #fff; border-color: var(--accent); background: rgba(229, 9, 20, .18); }
+
+    .banner {
+        display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+        background: var(--bg-2);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 12px 16px;
+        margin-bottom: 18px;
+        color: var(--muted);
+    }
+    .banner b { color: var(--text); }
+    .banner .pill-btn { margin-left: auto; }
+
+    /* ---------- Grid ---------- */
+    .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(165px, 1fr));
+        gap: 22px 16px;
+    }
+
+    .card { cursor: pointer; position: relative; outline: none; }
+
+    .poster {
+        position: relative;
+        aspect-ratio: 2 / 3;
+        border-radius: 10px;
+        overflow: hidden;
+        background: linear-gradient(160deg, #262b3a, #161922);
+        box-shadow: 0 6px 18px rgba(0, 0, 0, .4);
+        transition: transform .25s ease, box-shadow .25s ease;
+    }
+    .card:hover .poster, .card:focus-visible .poster {
+        transform: translateY(-6px) scale(1.02);
+        box-shadow: var(--shadow), 0 0 0 2px var(--accent);
+    }
+
+    .poster img {
+        position: absolute; inset: 0;
+        width: 100%; height: 100%;
+        object-fit: cover;
+        opacity: 0;
+        transition: opacity .35s;
+    }
+    .poster img.loaded { opacity: 1; }
+
+    .ph {
+        position: absolute; inset: 0;
+        display: flex; align-items: center; justify-content: center;
+        padding: 14px; text-align: center;
+        font-weight: 700; font-size: 1rem; color: #aab0c0; line-height: 1.3;
+    }
+
+    .badges {
+        position: absolute; top: 8px; left: 8px; right: 8px;
+        display: flex; gap: 5px; flex-wrap: wrap;
+        pointer-events: none;
+    }
+    .badge {
+        font-size: .68rem; font-weight: 700;
+        padding: 3px 7px;
+        border-radius: 5px;
+        background: rgba(0, 0, 0, .72);
+        backdrop-filter: blur(4px);
+        letter-spacing: .3px;
+    }
+    .badge.new { background: var(--accent); }
+    .badge.cam { background: #b8860b; }
+    .badge.q4k { background: #7b2ff7; }
+
+    .rating {
+        position: absolute; bottom: 8px; left: 8px;
+        font-size: .78rem; font-weight: 700;
+        padding: 3px 8px; border-radius: 6px;
+        background: rgba(0, 0, 0, .78);
+        color: var(--gold);
+    }
+    .rating:empty { display: none; }
+
+    .heart {
+        position: absolute; bottom: 6px; right: 6px;
+        width: 32px; height: 32px; border-radius: 50%;
+        background: rgba(0, 0, 0, .65);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1rem;
+        opacity: 0; transition: opacity .2s;
+    }
+    .card:hover .heart, .heart.on { opacity: 1; }
+    .heart.on { color: var(--accent-2); }
+
+    .card .title {
+        margin-top: 9px;
+        font-size: .9rem; font-weight: 600; line-height: 1.3;
+        display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .card .sub { margin-top: 3px; font-size: .78rem; color: var(--muted); }
+
+    .sentinel { height: 1px; }
+
+    /* ---------- States ---------- */
+    .state {
+        text-align: center;
+        padding: 80px 20px;
+        color: var(--muted);
+    }
+    .state .big { font-size: 3rem; margin-bottom: 12px; }
+    .state h3 { color: var(--text); margin-bottom: 8px; }
+    .state .pill-btn { margin-top: 16px; }
+
+    .skeleton .poster { animation: shimmer 1.3s infinite linear; background: linear-gradient(90deg, #191c26 0%, #232836 50%, #191c26 100%); background-size: 200% 100%; }
+    .skeleton .title { height: 12px; width: 80%; background: #1d212d; border-radius: 4px; }
+    @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+    /* ---------- Modal ---------- */
+    .modal-bg {
+        position: fixed; inset: 0; z-index: 100;
+        background: rgba(0, 0, 0, .75);
+        backdrop-filter: blur(6px);
+        display: none;
+        align-items: flex-start; justify-content: center;
+        overflow-y: auto;
+        padding: 40px 16px;
+    }
+    .modal-bg.open { display: flex; }
+
+    .modal {
+        width: 100%; max-width: 960px;
+        background: var(--bg-2);
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: var(--shadow);
+        border: 1px solid var(--line);
+        animation: pop .2s ease;
+    }
+    @keyframes pop { from { transform: translateY(14px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+    .hero {
+        position: relative;
+        min-height: 300px;
+        background: #0a0b0f center / cover no-repeat;
+    }
+    .hero::after {
+        content: ''; position: absolute; inset: 0;
+        background: linear-gradient(to top, var(--bg-2) 4%, rgba(21, 24, 33, .55) 55%, rgba(21, 24, 33, .25));
+    }
+    .hero iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; z-index: 2; }
+    .hero.playing { aspect-ratio: 16 / 9; min-height: 0; }
+    .hero.playing::after { display: none; }
+
+    .close-btn {
+        position: absolute; top: 14px; right: 14px; z-index: 3;
+        width: 38px; height: 38px; border-radius: 50%;
+        background: rgba(0, 0, 0, .7); font-size: 1.1rem;
+    }
+    .close-btn:hover { background: var(--accent); }
+
+    .modal-body {
+        position: relative; z-index: 2;
+        display: grid;
+        grid-template-columns: 200px 1fr;
+        gap: 26px;
+        padding: 0 30px 30px;
+        margin-top: -170px;
+    }
+    .hero.playing + .modal-body { margin-top: 20px; }
+
+    .modal-poster {
+        aspect-ratio: 2 / 3;
+        border-radius: 10px;
+        background: #1d212d center / cover no-repeat;
+        box-shadow: var(--shadow);
+    }
+
+    .modal h1 { font-size: 1.9rem; line-height: 1.2; margin-bottom: 8px; }
+    .facts { display: flex; flex-wrap: wrap; gap: 8px 14px; color: var(--muted); font-size: .9rem; margin-bottom: 14px; align-items: center; }
+    .facts .star { color: var(--gold); font-weight: 700; }
+    .tag { border: 1px solid var(--line); border-radius: 5px; padding: 1px 7px; font-size: .78rem; }
+    .overview { line-height: 1.6; color: #c9cdd8; margin-bottom: 18px; max-width: 640px; }
+
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; }
+    .btn {
+        display: inline-flex; align-items: center; gap: 7px;
+        padding: 10px 18px;
+        border-radius: 8px;
+        font-weight: 600; font-size: .92rem;
+        background: var(--bg-3); border: 1px solid var(--line);
+        transition: background .15s, transform .15s;
+    }
+    .btn:hover { background: #2a2f3f; transform: translateY(-1px); }
+    .btn.primary { background: var(--accent); border-color: var(--accent); }
+    .btn.primary:hover { background: var(--accent-2); }
+    .btn.white { background: var(--text); color: #111; border-color: var(--text); }
+    .btn.white:hover { background: #fff; }
+
+    .files { padding: 0 30px 30px; }
+    .files h3 { font-size: 1rem; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .crumbs { font-weight: 400; color: var(--muted); font-size: .85rem; }
+    .crumbs a { color: var(--text); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+
+    .file-list { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+    .file {
+        display: flex; align-items: center; gap: 12px;
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--line);
+        font-size: .88rem;
+    }
+    .file:last-child { border-bottom: none; }
+    .file:hover { background: var(--bg-3); }
+    .file .fi { width: 22px; text-align: center; }
+    .file .fn { flex: 1; word-break: break-word; }
+    .file .fs { color: var(--muted); white-space: nowrap; font-size: .8rem; }
+    .file.folder { cursor: pointer; }
+    .file .mini { padding: 5px 10px; border-radius: 6px; background: var(--bg-3); border: 1px solid var(--line); font-size: .78rem; white-space: nowrap; }
+    .file .mini:hover { background: var(--accent); border-color: var(--accent); }
+
+    /* ---------- Toast ---------- */
+    .toast {
+        position: fixed; left: 50%; bottom: 28px; z-index: 200;
+        transform: translateX(-50%) translateY(20px);
+        background: var(--text); color: #111;
+        padding: 11px 20px; border-radius: 999px;
+        font-weight: 600; font-size: .9rem;
+        box-shadow: var(--shadow);
+        opacity: 0; pointer-events: none;
+        transition: all .25s;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%); }
+
+    @media (max-width: 760px) {
+        .topbar-row { flex-wrap: wrap; padding: 10px 16px; gap: 10px; }
+        .search { order: 3; flex-basis: 100%; }
+        .search kbd { display: none; }
+        .row-scroll { padding: 0 16px 10px; }
+        main { padding: 16px; }
+        .grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 16px 12px; }
+        .modal-body { grid-template-columns: 1fr; margin-top: -120px; padding: 0 18px 22px; }
+        .modal-poster { width: 130px; }
+        .files { padding: 0 18px 22px; }
+        .modal h1 { font-size: 1.45rem; }
+    }
+</style>
+</head>
+<body>
+<header class="topbar">
+    <div class="topbar-row">
+        <div class="logo" id="logo" title="Home">DHAKA<span>FLIX</span></div>
+        <div class="search">
+            <span class="icon">⌕</span>
+            <input id="search" type="search" placeholder="Filter this list · press Enter to search everywhere" autocomplete="off">
+            <kbd>/</kbd>
+        </div>
+        <div class="top-actions">
+            <button class="pill-btn" id="myListBtn">♥ My List <span id="myListCount"></span></button>
+            <span class="status-dot" id="statusDot" title="Checking server..."></span>
+        </div>
+    </div>
+    <nav class="row-scroll" id="sections"></nav>
+    <nav class="row-scroll shelves" id="shelves"></nav>
+</header>
+
+<main>
+    <div class="toolbar">
+        <h2 id="heading">Loading…</h2>
+        <span class="count" id="count"></span>
+        <button class="toggle" id="fDual" title="Only show Dual / Multi audio">🔊 Dual Audio</button>
+        <button class="toggle" id="fNew" title="Added in the last 14 days">✨ New</button>
+        <button class="toggle" id="fHideCam" title="Hide CAM / HDTC / TS copies">🚫 Hide CAM</button>
+        <select id="quality" title="Quality">
+            <option value="">All qualities</option>
+            <option value="4K">4K / 2160p</option>
+            <option value="1080p">1080p</option>
+            <option value="720p">720p</option>
+            <option value="480p">480p</option>
+        </select>
+        <select id="sort" title="Sort">
+            <option value="added">Recently added</option>
+            <option value="rating">Top rated</option>
+            <option value="year">Release year</option>
+            <option value="name">Name A–Z</option>
+            <option value="size">File size</option>
+        </select>
+    </div>
+    <div id="banner"></div>
+    <div class="grid" id="grid"></div>
+    <div class="sentinel" id="sentinel"></div>
+    <div id="state"></div>
+</main>
+
+<div class="modal-bg" id="modalBg">
+    <div class="modal" id="modal" role="dialog" aria-modal="true"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// TMDB Read Access Token (used only for ratings, posters, plots and trailers)
+const TMDB_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI2MTM5MTcwZWNiZDRkMDlkZDhiNjEwMGMzMmQ4ZGMzZSIsIm5iZiI6MTc2NjM2NTE0My45MjUsInN1YiI6IjY5NDg5N2Q3ZDZmYjE4MTFiMDdhYzA1NSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.mGFIYeXIejioSNygClj_QfW-40LrtAG1OLquTUQhPn4';
+const TMDB_IMG = 'https://image.tmdb.org/t/p/';
+const API = '/api';
+const PAGE = 60;
+const NEW_DAYS = 14;
+
+const $ = id => document.getElementById(id);
+
+// ---------------- Persistent state ----------------
+const store = {
+    get(key, fallback) {
+        try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v); } catch { return fallback; }
+    },
+    set(key, value) {
+        try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* storage full or blocked */ }
+    }
+};
+
+const prefs = Object.assign({
+    section: 'english',
+    shelfBySection: {},
+    sort: 'added',
+    quality: '',
+    dual: false,
+    fresh: false,
+    hideCam: false
+}, store.get('mf:prefs', {}));
+const savePrefs = () => store.set('mf:prefs', prefs);
+
+let myList = store.get('mf:mylist', []);
+
+const state = {
+    sections: [],
+    shelves: [],
+    view: 'section',        // 'section' | 'search' | 'mylist'
+    items: [],              // everything loaded for the current view
+    visible: [],            // after filter + sort
+    rendered: 0,
+    query: '',
+    loadToken: 0
+};
+
+// ---------------- Helpers ----------------
+function esc(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function fmtSize(bytes) {
+    if (!bytes) return '';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let i = 0;
+    while (bytes >= 1024 && i < units.length - 1) { bytes /= 1024; i++; }
+    return `${bytes.toFixed(i >= 3 ? 2 : 0)} ${units[i]}`;
+}
+
+function toast(msg) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toast.timer);
+    toast.timer = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+async function api(path) {
+    const res = await fetch(API + path);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+    return data;
+}
+
+// Pull a clean title, year and tags out of folder names like
+// "Avatar-Fire and Ash (2025) 720p HDTC [Dual Audio]" or "Dark (TV Series 2017–2020) 1080p".
+function parseName(raw) {
+    const name = raw.replace(/^\d{1,3}\.\s+/, '').replace(/^#/, '');
+    const ym = name.match(/\((?:[A-Za-z ]*?)((?:19|20)\d{2})/);
+    const year = ym ? parseInt(ym[1], 10) : null;
+    const base = (ym ? name.slice(0, ym.index) : name.replace(/\s(480|720|1080|2160)p.*$/i, '')).replace(/_/g, ' ').trim();
+    // The server writes "Avatar-Fire and Ash" for "Avatar: Fire and Ash", but "Spider-Man" is a real hyphen.
+    const segs = base.split(/\s*-\s*/).filter(Boolean);
+    let title = segs[0] || name;
+    for (let i = 1; i < segs.length; i++) {
+        const realHyphen = i === 1 && !/\s/.test(segs[0]) && !/\s/.test(segs[1]);
+        title += (realHyphen ? '-' : ': ') + segs[i];
+    }
+    const q = /2160p|4K|UHD/i.test(raw) ? '4K' : /1080p/i.test(raw) ? '1080p' : /720p/i.test(raw) ? '720p' : /480p/i.test(raw) ? '480p' : '';
+    return {
+        title,
+        year,
+        quality: q,
+        dual: /dual audio|multi audio/i.test(raw),
+        cam: /\b(HDCAM|CAM|HDTC|HDTS|TS|TC|PreDVD)\b/.test(raw),
+        is3d: /\[3D\]/i.test(raw),
+        tv: /\((?:TV |Web |Mini )*Series|Season|TV Cartoon|Anime/i.test(raw)
+    };
+}
+
+function enrich(item, sectionId) {
+    const p = parseName(item.name);
+    const section = state.sections.find(s => s.id === (item.section || sectionId));
+    return Object.assign(item, p, {
+        section: item.section || sectionId,
+        tv: p.tv || !!(section && section.tv),
+        size: item.size || 0,
+        videos: item.videos || []
+    });
+}
+
+// ---------------- TMDB (cached in localStorage) ----------------
+const tmdbMem = new Map();
+const tmdbQueue = [];
+let tmdbActive = 0;
+
+function tmdbKey(item) { return `${item.tv ? 'tv' : 'mv'}|${item.title.toLowerCase()}|${item.year || ''}`; }
+
+function tmdbCached(item) {
+    const key = tmdbKey(item);
+    if (tmdbMem.has(key)) return tmdbMem.get(key);
+    const hit = store.get('tmdb:' + key, undefined);
+    // Misses are retried after 3 days, hits are kept for 14.
+    if (hit && Date.now() - hit.at < (hit.data ? 14 : 3) * 864e5) {
+        tmdbMem.set(key, hit.data);
+        return hit.data;
+    }
+    return undefined;
+}
+
+async function tmdbFetch(path) {
+    const res = await fetch('https://api.themoviedb.org/3' + path, {
+        headers: { Authorization: `Bearer ${TMDB_TOKEN}`, accept: 'application/json' }
+    });
+    if (!res.ok) throw new Error('TMDB ' + res.status);
+    return res.json();
+}
+
+async function tmdbLookup(item) {
+    const kind = item.tv ? 'tv' : 'movie';
+    const yearParam = item.year ? (item.tv ? `&first_air_date_year=${item.year}` : `&year=${item.year}`) : '';
+    const q = encodeURIComponent(item.title.replace(/:/g, ' '));
+    let data = await tmdbFetch(`/search/${kind}?query=${q}${yearParam}&include_adult=false&language=en-US&page=1`);
+    if (!data.results?.length && item.year) {
+        data = await tmdbFetch(`/search/${kind}?query=${q}&include_adult=false&language=en-US&page=1`);
+    }
+    const r = data.results?.[0];
+    if (!r) return null;
+    return {
+        id: r.id,
+        kind,
+        title: r.title || r.name,
+        rating: r.vote_average ? Math.round(r.vote_average * 10) / 10 : null,
+        votes: r.vote_count || 0,
+        poster: r.poster_path,
+        backdrop: r.backdrop_path,
+        overview: r.overview,
+        date: r.release_date || r.first_air_date || ''
+    };
+}
+
+function getTmdb(item, priority = false) {
+    const cachedVal = tmdbCached(item);
+    if (cachedVal !== undefined) return Promise.resolve(cachedVal);
+    const key = tmdbKey(item);
+    if (getTmdb.pending.has(key)) return getTmdb.pending.get(key);
+    const promise = new Promise(resolve => {
+        const job = async () => {
+            let data = null, ok = true;
+            try { data = await tmdbLookup(item); } catch { ok = false; }
+            tmdbMem.set(key, data);
+            if (ok) store.set('tmdb:' + key, { at: Date.now(), data });
+            getTmdb.pending.delete(key);
+            resolve(data);
+        };
+        priority ? tmdbQueue.unshift(job) : tmdbQueue.push(job);
+        pumpTmdb();
+    });
+    getTmdb.pending.set(key, promise);
+    return promise;
+}
+getTmdb.pending = new Map();
+
+function pumpTmdb() {
+    while (tmdbActive < 6 && tmdbQueue.length) {
+        const job = tmdbQueue.shift();
+        tmdbActive++;
+        job().finally(() => {
+            tmdbActive--;
+            pumpTmdb();
+            if (!tmdbActive && !tmdbQueue.length) onTmdbIdle();
+        });
+    }
+}
+
+function onTmdbIdle() {
+    if (prefs.sort === 'rating' && state.view !== 'mylist') applyView(true);
+}
+
+// ---------------- Sections & shelves ----------------
+function renderSections() {
+    const nav = $('sections');
+    let html = '';
+    let group = null;
+    for (const s of state.sections) {
+        if (s.group !== group) {
+            group = s.group;
+            html += `<span class="group-label">${esc(group)}</span>`;
+        }
+        const active = state.view === 'section' && prefs.section === s.id;
+        html += `<button class="chip${active ? ' active' : ''}" data-section="${esc(s.id)}">${esc(s.name)}</button>`;
+    }
+    nav.innerHTML = html;
+    nav.querySelector('.chip.active')?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+}
+
+function renderShelves() {
+    const nav = $('shelves');
+    const section = currentSection();
+    if (state.view !== 'section' || !section?.nested || !state.shelves.length) {
+        nav.style.display = 'none';
+        return;
+    }
+    nav.style.display = 'flex';
+    const current = prefs.shelfBySection[section.id];
+    nav.innerHTML = state.shelves.map(s =>
+        `<button class="chip${s.url === current ? ' active' : ''}" data-shelf="${esc(s.url)}" title="${esc(s.name)}">${esc(shelfLabel(s.name))}</button>`
+    ).join('');
+    nav.querySelector('.chip.active')?.scrollIntoView({ inline: 'center', block: 'nearest' });
+}
+
+// "(2025)" -> "2025", "TV Series ♥  A  —  L" -> "A – L", "DC ... (2008-2019) 720p & 1080p [Dual Audio]" -> "DC ... (2008-2019)"
+function shelfLabel(name) {
+    return name
+        .replace(/^\((\d{4})\)/, '$1')
+        .replace(/^.*?Series\s*[★♥♦♣♠]?\s*/i, '')
+        .replace(/\s*[—–]\s*/g, ' – ')
+        .replace(/\s+\d{3,4}p\b.*$/i, '')
+        .replace(/\s*\[.*?\]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim() || name;
+}
+
+const currentSection = () => state.sections.find(s => s.id === prefs.section);
+
+async function openSection(id) {
+    prefs.section = id;
+    savePrefs();
+    state.view = 'section';
+    clearSearch();
+    renderSections();
+    const section = currentSection();
+    if (!section) return;
+
+    if (!section.nested) {
+        state.shelves = [];
+        renderShelves();
+        return loadItems(`section=${encodeURIComponent(section.id)}`, section.name);
+    }
+
+    const token = ++state.loadToken;
+    showSkeleton(section.name);
+    try {
+        const { shelves } = await api(`/shelves?section=${encodeURIComponent(id)}`);
+        if (token !== state.loadToken) return;
+        state.shelves = shelves;
+        // Use the shelf the user picked last time, otherwise the newest one.
+        let shelf = shelves.find(s => s.url === prefs.shelfBySection[id]);
+        if (!shelf) {
+            const thisYear = new Date().getFullYear();
+            shelf = shelves.find(s => s.year > 0 && s.year <= thisYear) || shelves[0];
+        }
+        openShelf(shelf?.url);
+    } catch (err) {
+        if (token === state.loadToken) showError(err);
+    }
+}
+
+function openShelf(url) {
+    const section = currentSection();
+    const shelf = state.shelves.find(s => s.url === url);
+    if (!shelf) return;
+    prefs.shelfBySection[section.id] = url;
+    savePrefs();
+    state.view = 'section';
+    renderShelves();
+    loadItems(`url=${encodeURIComponent(url)}`, `${section.name} · ${shelfLabel(shelf.name)}`);
+}
+
+async function loadItems(query, heading) {
+    const token = ++state.loadToken;
+    showSkeleton(heading);
+    try {
+        const items = await api(`/items?${query}`);
+        if (token !== state.loadToken) return;
+        state.items = items.map(i => enrich(i, prefs.section));
+        $('heading').textContent = heading;
+        applyView();
+    } catch (err) {
+        if (token === state.loadToken) showError(err);
+    }
+}
+
+// ---------------- Search ----------------
+function clearSearch() {
+    $('search').value = '';
+    state.query = '';
+}
+
+async function searchEverywhere(q) {
+    q = q.trim();
+    if (q.length < 2) return toast('Type at least 2 letters');
+    state.view = 'search';
+    state.query = '';
+    renderSections();
+    renderShelves();
+    const token = ++state.loadToken;
+    showSkeleton(`Results for “${q}”`);
+    try {
+        const { results, total, failed } = await api(`/search?q=${encodeURIComponent(q)}`);
+        if (token !== state.loadToken) return;
+        state.items = results.map(r => enrich(r, r.section));
+        $('heading').textContent = `Results for “${q}”`;
+        const notes = [];
+        if (total > results.length) notes.push(`Showing the first ${results.length} of ${total} matches — be more specific to narrow it down.`);
+        if (failed.length) notes.push(`Could not reach: ${failed.join(', ')}.`);
+        $('banner').innerHTML = notes.length ? `<div class="banner">${esc(notes.join(' '))}</div>` : '';
+        applyView();
+    } catch (err) {
+        if (token === state.loadToken) showError(err);
+    }
+}
+
+// ---------------- Filtering, sorting, rendering ----------------
+function rating(item) { return tmdbCached(item)?.rating || 0; }
+
+function applyView(keepScroll = false) {
+    const q = state.query.toLowerCase();
+    const freshCutoff = Date.now() - NEW_DAYS * 864e5;
+    let list = state.items.filter(i =>
+        (!q || i.name.toLowerCase().includes(q) || i.title.toLowerCase().includes(q)) &&
+        (!prefs.quality || i.quality === prefs.quality) &&
+        (!prefs.dual || i.dual) &&
+        (!prefs.hideCam || !i.cam) &&
+        (!prefs.fresh || i.time >= freshCutoff)
+    );
+
+    const byName = (a, b) => a.title.localeCompare(b.title);
+    const sorters = {
+        added: (a, b) => (b.time || 0) - (a.time || 0),
+        rating: (a, b) => rating(b) - rating(a) || byName(a, b),
+        year: (a, b) => (b.year || 0) - (a.year || 0) || (b.time || 0) - (a.time || 0),
+        name: byName,
+        size: (a, b) => (b.size || 0) - (a.size || 0)
+    };
+    list.sort(sorters[prefs.sort] || sorters.added);
+    state.visible = list;
+
+    const total = state.items.length;
+    $('count').textContent = list.length === total
+        ? `${total} title${total === 1 ? '' : 's'}`
+        : `${list.length} of ${total} titles`;
+
+    if (state.view === 'section' && q) {
+        $('banner').innerHTML = `<div class="banner">Filtering this list for <b>${esc(state.query)}</b>. Not here? <button class="pill-btn" data-action="search-all">⌕ Search all sections</button></div>`;
+    } else if (state.view === 'section') {
+        $('banner').innerHTML = '';
+    }
+
+    const keep = keepScroll ? Math.max(state.rendered, PAGE) : PAGE;
+    $('grid').innerHTML = '';
+    state.rendered = 0;
+    renderMore(keep);
+
+    if (prefs.sort === 'rating' && state.view !== 'mylist') {
+        list.forEach(i => getTmdb(i).then(d => d && updateCardTmdb(i, d)));
+    }
+
+    if (!list.length) {
+        $('state').innerHTML = total
+            ? `<div class="state"><div class="big">🔍</div><h3>Nothing matches these filters</h3><p>Try clearing the search or turning off a filter.</p>${state.query ? '<button class="pill-btn" data-action="search-all">⌕ Search all sections instead</button>' : ''}</div>`
+            : state.view === 'mylist'
+                ? `<div class="state"><div class="big">♡</div><h3>Your list is empty</h3><p>Tap the heart on any movie to save it here.</p></div>`
+                : `<div class="state"><div class="big">🎞️</div><h3>No titles found</h3><p>This folder is empty.</p></div>`;
+    } else {
+        $('state').innerHTML = '';
+    }
+}
+
+const cardObserver = new IntersectionObserver(entries => {
+    for (const e of entries) {
+        if (!e.isIntersecting) continue;
+        cardObserver.unobserve(e.target);
+        hydrateCard(e.target);
+    }
+}, { rootMargin: '400px 0px' });
+
+const sentinelObserver = new IntersectionObserver(entries => {
+    if (entries[0].isIntersecting && state.rendered < state.visible.length) renderMore(PAGE);
+}, { rootMargin: '900px 0px' });
+sentinelObserver.observe($('sentinel'));
+
+function isSaved(item) { return myList.some(m => m.url === item.url); }
+
+function cardHtml(item, index) {
+    const fresh = item.time && item.time >= Date.now() - NEW_DAYS * 864e5;
+    const badges = [
+        fresh ? '<span class="badge new">NEW</span>' : '',
+        item.quality ? `<span class="badge${item.quality === '4K' ? ' q4k' : ''}">${item.quality}</span>` : '',
+        item.is3d ? '<span class="badge">3D</span>' : '',
+        item.dual ? '<span class="badge">DUAL</span>' : '',
+        item.cam ? '<span class="badge cam">CAM</span>' : ''
+    ].join('');
+    const t = tmdbCached(item);
+    const sub = [item.year, item.tv ? 'Series' : '', fmtSize(item.size)].filter(Boolean).join(' · ');
+    const poster = item.poster || (t?.poster ? TMDB_IMG + 'w342' + t.poster : '');
+    return `
+        <div class="card" tabindex="0" data-i="${index}">
+            <div class="poster">
+                <div class="ph">${esc(item.title)}</div>
+                ${poster ? `<img src="${esc(poster)}" alt="" loading="lazy" onload="this.classList.add('loaded')" onerror="this.remove()">` : ''}
+                <div class="badges">${badges}</div>
+                <span class="rating">${t?.rating ? '★ ' + t.rating.toFixed(1) : ''}</span>
+                <button class="heart${isSaved(item) ? ' on' : ''}" data-action="heart" title="My List">${isSaved(item) ? '♥' : '♡'}</button>
+            </div>
+            <div class="title" title="${esc(item.name)}">${esc(item.title)}</div>
+            <div class="sub">${esc(sub)}</div>
+        </div>`;
+}
+
+function renderMore(count) {
+    const grid = $('grid');
+    const end = Math.min(state.visible.length, state.rendered + count);
+    const html = [];
+    for (let i = state.rendered; i < end; i++) html.push(cardHtml(state.visible[i], i));
+    grid.insertAdjacentHTML('beforeend', html.join(''));
+    grid.querySelectorAll('.card:not([data-watched])').forEach(card => {
+        card.dataset.watched = '1';
+        cardObserver.observe(card);
+    });
+    state.rendered = end;
+}
+
+// Fill in rating / missing poster once a card scrolls into view.
+async function hydrateCard(card) {
+    const item = state.visible[+card.dataset.i];
+    if (!item) return;
+    if (!item.poster && !item.posterTried && !item.isFile) {
+        item.posterTried = true;
+        try {
+            const info = await api(`/folder?url=${encodeURIComponent(item.url)}`);
+            item.poster = info.poster;
+            item.backdrop = info.backdrop;
+            if (info.poster) setCardPoster(item, info.poster);
+        } catch { /* poster is optional */ }
+    }
+    const data = await getTmdb(item);
+    if (data) updateCardTmdb(item, data);
+}
+
+function cardsFor(item) {
+    const idx = state.visible.indexOf(item);
+    return idx < 0 ? [] : [...document.querySelectorAll(`.card[data-i="${idx}"]`)];
+}
+
+function setCardPoster(item, src) {
+    for (const card of cardsFor(item)) {
+        const box = card.querySelector('.poster');
+        if (box.querySelector('img')) continue;
+        const img = document.createElement('img');
+        img.alt = '';
+        img.onload = () => img.classList.add('loaded');
+        img.onerror = () => img.remove();
+        img.src = src;
+        box.querySelector('.ph').after(img);
+    }
+}
+
+function updateCardTmdb(item, data) {
+    for (const card of cardsFor(item)) {
+        if (data.rating) card.querySelector('.rating').textContent = '★ ' + data.rating.toFixed(1);
+    }
+    if (!item.poster && data.poster) setCardPoster(item, TMDB_IMG + 'w342' + data.poster);
+}
+
+function showSkeleton(heading) {
+    $('heading').textContent = heading;
+    $('count').textContent = '';
+    $('banner').innerHTML = '';
+    $('state').innerHTML = '';
+    state.visible = [];
+    state.rendered = 0;
+    $('grid').innerHTML = Array.from({ length: 18 }, () =>
+        '<div class="card skeleton"><div class="poster"></div><div class="title" style="margin-top:10px"></div></div>').join('');
+}
+
+function showError(err) {
+    $('grid').innerHTML = '';
+    $('count').textContent = '';
+    $('state').innerHTML = `
+        <div class="state">
+            <div class="big">📡</div>
+            <h3>Couldn't reach DHAKA FLIX</h3>
+            <p>${esc(err.message)}</p>
+            <p style="margin-top:6px">Make sure you're connected to the network that has access to 172.16.50.x.</p>
+            <button class="pill-btn" data-action="retry">↻ Try again</button>
+        </div>`;
+}
+
+// ---------------- My List ----------------
+function toggleSaved(item) {
+    if (isSaved(item)) {
+        myList = myList.filter(m => m.url !== item.url);
+        toast('Removed from My List');
+    } else {
+        const { name, url, time, poster, backdrop, section, size, isFile, videos } = item;
+        myList.unshift({ name, url, time, poster, backdrop, section, size, isFile, videos });
+        toast('Added to My List ♥');
+    }
+    store.set('mf:mylist', myList);
+    updateMyListCount();
+    for (const card of cardsFor(item)) {
+        const h = card.querySelector('.heart');
+        h.classList.toggle('on', isSaved(item));
+        h.textContent = isSaved(item) ? '♥' : '♡';
+    }
+    if (state.view === 'mylist') showMyList();
+}
+
+function updateMyListCount() {
+    $('myListCount').textContent = myList.length ? `(${myList.length})` : '';
+}
+
+function showMyList() {
+    state.loadToken++;
+    state.view = 'mylist';
+    clearSearch();
+    renderSections();
+    renderShelves();
+    $('myListBtn').classList.add('active');
+    $('heading').textContent = 'My List';
+    $('banner').innerHTML = '';
+    state.items = myList.map(m => enrich({ ...m }, m.section));
+    applyView();
+}
+
+// ---------------- Details modal ----------------
+let modalItem = null;
+let modalPath = [];
+
+async function openDetails(item) {
+    modalItem = item;
+    modalPath = [{ name: item.title, url: item.url }];
+    renderModal(item, tmdbCached(item));
+    $('modalBg').classList.add('open');
+    document.body.style.overflow = 'hidden';
+
+    if (!item.isFile) loadModalFolder();
+
+    const t = await getTmdb(item, true);
+    if (modalItem !== item) return;
+    if (t) {
+        updateCardTmdb(item, t);
+        renderModalInfo(item, t);
+        try {
+            const d = await tmdbFetch(`/${t.kind}/${t.id}?append_to_response=videos&language=en-US`);
+            if (modalItem !== item) return;
+            const vids = d.videos?.results || [];
+            const trailer = vids.find(v => v.site === 'YouTube' && v.type === 'Trailer' && v.official)
+                || vids.find(v => v.site === 'YouTube' && v.type === 'Trailer')
+                || vids.find(v => v.site === 'YouTube');
+            item.trailerKey = trailer?.key;
+            item.details = {
+                genres: (d.genres || []).map(g => g.name),
+                runtime: d.runtime || d.episode_run_time?.[0],
+                seasons: d.number_of_seasons,
+                tagline: d.tagline
+            };
+            renderModalInfo(item, t);
+        } catch { /* details are optional */ }
+    }
+}
+
+function renderModal(item, t) {
+    $('modal').innerHTML = `
+        <div class="hero" id="hero">
+            <button class="close-btn" data-action="close" title="Close (Esc)">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="modal-poster" id="mPoster"></div>
+            <div id="mInfo"></div>
+        </div>
+        <div class="files" id="mFiles"></div>`;
+    renderModalInfo(item, t);
+    if (item.isFile) renderFileList([{ name: item.name, url: item.url, size: item.size, type: 'video' }]);
+}
+
+function renderModalInfo(item, t) {
+    const backdrop = t?.backdrop ? TMDB_IMG + 'w1280' + t.backdrop : item.backdrop || item.poster || '';
+    const hero = $('hero');
+    if (hero && !hero.classList.contains('playing')) hero.style.backgroundImage = backdrop ? `url("${backdrop}")` : '';
+    const poster = item.poster || (t?.poster ? TMDB_IMG + 'w500' + t.poster : '');
+    $('mPoster').style.backgroundImage = poster ? `url("${poster}")` : '';
+
+    const d = item.details || {};
+    const facts = [
+        t?.rating ? `<span class="star">★ ${t.rating.toFixed(1)}</span><span>${t.votes.toLocaleString()} votes</span>` : '',
+        item.year ? `<span>${item.year}</span>` : '',
+        d.runtime ? `<span>${Math.floor(d.runtime / 60) ? Math.floor(d.runtime / 60) + 'h ' : ''}${d.runtime % 60}m</span>` : '',
+        d.seasons ? `<span>${d.seasons} season${d.seasons > 1 ? 's' : ''}</span>` : '',
+        item.quality ? `<span class="tag">${item.quality}</span>` : '',
+        item.dual ? '<span class="tag">Dual Audio</span>' : '',
+        item.cam ? '<span class="tag" style="border-color:#b8860b;color:#f0c050">CAM copy</span>' : '',
+        item.size ? `<span>${fmtSize(item.size)}</span>` : ''
+    ].join('');
+    const video = item.videos[0];
+    const saved = isSaved(item);
+    $('mInfo').innerHTML = `
+        <h1>${esc(t?.title || item.title)}</h1>
+        <div class="facts">${facts}</div>
+        ${d.genres?.length ? `<div class="facts">${d.genres.map(g => `<span class="tag">${esc(g)}</span>`).join('')}</div>` : ''}
+        <p class="overview">${esc(t?.overview || (t === null ? 'No description found on TMDB.' : 'Loading details…'))}</p>
+        <div class="actions">
+            ${video ? `<button class="btn primary" data-action="download" data-url="${esc(video.url)}">⬇ Download${item.videos.length > 1 ? ' (1st file)' : ''}</button>` : ''}
+            ${video ? `<button class="btn white" data-action="vlc" title="Opens a playlist file - VLC streams it straight from the server">▶ Play in VLC</button>` : ''}
+            <button class="btn" data-action="trailer">🎬 Trailer</button>
+            ${video ? `<button class="btn" data-action="copy" data-url="${esc(video.url)}">🔗 Copy link</button>` : ''}
+            <button class="btn" data-action="modal-heart">${saved ? '♥ In My List' : '♡ My List'}</button>
+            <button class="btn" data-action="open-folder">📂 Open folder</button>
+        </div>`;
+}
+
+async function loadModalFolder() {
+    const here = modalPath[modalPath.length - 1];
+    const box = $('mFiles');
+    box.innerHTML = `<h3>Files</h3><div class="file-list"><div class="file"><span class="fn" style="color:var(--muted)">Loading files…</span></div></div>`;
+    try {
+        const info = await api(`/folder?url=${encodeURIComponent(here.url)}`);
+        if (modalPath[modalPath.length - 1] !== here) return;
+        renderFileList(info.entries.filter(e => e.type !== 'image'));
+        if (modalPath.length === 1 && !modalItem.backdrop && info.backdrop) {
+            modalItem.backdrop = info.backdrop;
+            renderModalInfo(modalItem, tmdbCached(modalItem));
+        }
+    } catch (err) {
+        box.innerHTML = `<h3>Files</h3><div class="file-list"><div class="file"><span class="fn">⚠ ${esc(err.message)}</span></div></div>`;
+    }
+}
+
+function renderFileList(entries) {
+    const crumbs = modalPath.length > 1
+        ? `<span class="crumbs">${modalPath.map((p, i) => i < modalPath.length - 1
+            ? `<a data-action="crumb" data-depth="${i}">${esc(i === 0 ? 'Top' : p.name)}</a>`
+            : esc(p.name)).join(' / ')}</span>` : '';
+    const videos = entries.filter(e => e.type === 'video');
+    const icons = { folder: '📁', video: '🎞️', subtitle: '💬', file: '📄' };
+    const rows = entries.map((e, i) => `
+        <div class="file${e.type === 'folder' ? ' folder' : ''}" ${e.type === 'folder' ? `data-action="enter" data-i="${i}"` : ''}>
+            <span class="fi">${icons[e.type] || '📄'}</span>
+            <span class="fn">${esc(e.name)}</span>
+            <span class="fs">${fmtSize(e.size)}</span>
+            ${e.type === 'folder'
+                ? '<span class="fs">›</span>'
+                : `<button class="mini" data-action="copy" data-url="${esc(e.url)}" title="Copy link">🔗</button>
+                   <button class="mini" data-action="download" data-url="${esc(e.url)}">⬇ Download</button>`}
+        </div>`).join('');
+    $('mFiles').innerHTML = `
+        <h3>Files ${crumbs}
+            ${videos.length > 1 ? `<button class="mini btn" style="margin-left:auto;padding:6px 12px" data-action="vlc-all">▶ Play all ${videos.length} in VLC</button>` : ''}
+        </h3>
+        <div class="file-list">${rows || '<div class="file"><span class="fn" style="color:var(--muted)">Empty folder</span></div>'}</div>`;
+    $('mFiles').entries = entries;
+}
+
+function closeModal() {
+    $('modalBg').classList.remove('open');
+    $('modal').innerHTML = '';
+    document.body.style.overflow = '';
+    modalItem = null;
+}
+
+function playTrailer(item) {
+    if (!item.trailerKey) {
+        const q = `${item.title} ${item.year || ''} ${item.tv ? 'series' : ''} trailer`;
+        window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`, '_blank');
+        return;
+    }
+    const hero = $('hero');
+    hero.classList.add('playing');
+    hero.style.backgroundImage = '';
+    hero.insertAdjacentHTML('beforeend',
+        `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(item.trailerKey)}?autoplay=1&rel=0" allow="autoplay; encrypted-media; fullscreen" allowfullscreen></iframe>`);
+}
+
+// A tiny .m3u playlist lets VLC (or any player) stream the file straight from the server.
+function playInVlc(files, name) {
+    const body = '#EXTM3U\n' + files.map(f => `#EXTINF:-1,${f.name}\n${f.url}`).join('\n') + '\n';
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([body], { type: 'audio/x-mpegurl' }));
+    a.download = name.replace(/[\\/:*?"<>|]+/g, ' ').trim() + '.m3u';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    toast('Playlist saved - open it to stream in VLC');
+}
+
+async function copyLink(url) {
+    try {
+        await navigator.clipboard.writeText(url);
+    } catch {
+        const ta = document.createElement('textarea');
+        ta.value = url;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+    }
+    toast('Link copied - paste into VLC (Ctrl+N) or your download manager');
+}
+
+// ---------------- Events ----------------
+$('sections').addEventListener('click', e => {
+    const b = e.target.closest('[data-section]');
+    if (b) { $('myListBtn').classList.remove('active'); openSection(b.dataset.section); }
+});
+
+$('shelves').addEventListener('click', e => {
+    const b = e.target.closest('[data-shelf]');
+    if (b) { clearSearch(); openShelf(b.dataset.shelf); }
+});
+
+$('grid').addEventListener('click', e => {
+    const card = e.target.closest('.card');
+    if (!card || card.classList.contains('skeleton')) return;
+    const item = state.visible[+card.dataset.i];
+    if (!item) return;
+    if (e.target.closest('[data-action="heart"]')) {
+        e.stopPropagation();
+        toggleSaved(item);
+        return;
+    }
+    openDetails(item);
+});
+
+$('grid').addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    const card = e.target.closest('.card');
+    if (card && state.visible[+card.dataset.i]) openDetails(state.visible[+card.dataset.i]);
+});
+
+document.addEventListener('click', e => {
+    const el = e.target.closest('[data-action]');
+    if (!el) return;
+    const action = el.dataset.action;
+    const item = modalItem;
+    switch (action) {
+        case 'retry':
+            state.view === 'search' ? searchEverywhere($('search').value) : openSection(prefs.section);
+            break;
+        case 'search-all':
+            searchEverywhere(state.query);
+            break;
+        case 'close':
+            closeModal();
+            break;
+        case 'download':
+            window.open(el.dataset.url, '_blank');
+            toast('Download started');
+            break;
+        case 'copy':
+            e.stopPropagation();
+            copyLink(el.dataset.url);
+            break;
+        case 'trailer':
+            playTrailer(item);
+            break;
+        case 'vlc':
+            playInVlc(item.videos, item.title);
+            break;
+        case 'vlc-all': {
+            const vids = ($('mFiles').entries || []).filter(f => f.type === 'video');
+            playInVlc(vids, `${item.title} - ${modalPath[modalPath.length - 1].name}`);
+            break;
+        }
+        case 'modal-heart':
+            toggleSaved(item);
+            renderModalInfo(item, tmdbCached(item));
+            break;
+        case 'open-folder':
+            window.open(modalPath[modalPath.length - 1].url, '_blank');
+            break;
+        case 'enter': {
+            const entry = $('mFiles').entries[+el.dataset.i];
+            modalPath.push({ name: entry.name, url: entry.url });
+            loadModalFolder();
+            break;
+        }
+        case 'crumb':
+            modalPath = modalPath.slice(0, +el.dataset.depth + 1);
+            loadModalFolder();
+            break;
+    }
+});
+
+$('modalBg').addEventListener('click', e => { if (e.target === $('modalBg')) closeModal(); });
+
+let filterTimer;
+$('search').addEventListener('input', e => {
+    clearTimeout(filterTimer);
+    filterTimer = setTimeout(() => {
+        state.query = e.target.value.trim();
+        if (state.view === 'search' && !state.query) return openSection(prefs.section);
+        if (state.view === 'search') return;
+        applyView();
+    }, 120);
+});
+
+$('search').addEventListener('keydown', e => {
+    if (e.key === 'Enter') searchEverywhere(e.target.value);
+    if (e.key === 'Escape') {
+        e.target.value = '';
+        e.target.blur();
+        if (state.view === 'search') openSection(prefs.section);
+        else { state.query = ''; applyView(); }
+    }
+});
+
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && $('modalBg').classList.contains('open')) closeModal();
+    if (e.key === '/' && document.activeElement !== $('search') && !$('modalBg').classList.contains('open')) {
+        e.preventDefault();
+        $('search').focus();
+        $('search').select();
+    }
+});
+
+$('myListBtn').addEventListener('click', () => {
+    if (state.view === 'mylist') {
+        $('myListBtn').classList.remove('active');
+        openSection(prefs.section);
+    } else {
+        showMyList();
+    }
+});
+
+$('logo').addEventListener('click', () => {
+    $('myListBtn').classList.remove('active');
+    openSection(prefs.section);
+});
+
+function bindToggle(id, key) {
+    const el = $(id);
+    el.classList.toggle('on', !!prefs[key]);
+    el.addEventListener('click', () => {
+        prefs[key] = !prefs[key];
+        el.classList.toggle('on', prefs[key]);
+        savePrefs();
+        applyView();
+    });
+}
+bindToggle('fDual', 'dual');
+bindToggle('fNew', 'fresh');
+bindToggle('fHideCam', 'hideCam');
+
+$('quality').value = prefs.quality;
+$('quality').addEventListener('change', e => { prefs.quality = e.target.value; savePrefs(); applyView(); });
+$('sort').value = prefs.sort;
+$('sort').addEventListener('change', e => {
+    prefs.sort = e.target.value;
+    savePrefs();
+    if (prefs.sort === 'rating') toast('Fetching ratings - list re-sorts when done');
+    applyView();
+});
+
+// ---------------- Start ----------------
+async function init() {
+    updateMyListCount();
+    try {
+        state.sections = await api('/sections');
+        $('statusDot').className = 'status-dot ok';
+        $('statusDot').title = 'App server running';
+    } catch (err) {
+        $('statusDot').className = 'status-dot bad';
+        $('statusDot').title = 'App server not responding';
+        showError(new Error('The Movie Fetcher server is not running. Start it with "Start Movie Fetcher".'));
+        return;
+    }
+    if (!state.sections.some(s => s.id === prefs.section)) prefs.section = state.sections[0].id;
+    openSection(prefs.section);
+}
+
+init();
+</script>
+</body>
+</html>
