@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>DHAKA FLIX Movie Fetcher</title>
 <style>
     :root {
@@ -41,6 +41,7 @@
 
     /* ---------- Top bar ---------- */
     .topbar {
+        padding-top: env(safe-area-inset-top);
         position: sticky;
         top: 0;
         z-index: 50;
@@ -114,8 +115,36 @@
         overflow-x: auto;
         padding: 0 24px 12px;
         scrollbar-width: none;
+        scroll-behavior: smooth;
     }
     .row-scroll::-webkit-scrollbar { display: none; }
+
+    /* On desktop every category fits on screen by wrapping instead of scrolling. */
+    @media (min-width: 761px) {
+        #sections { flex-wrap: wrap; row-gap: 8px; overflow: visible; }
+    }
+
+    /* Year / shelf row: arrow buttons, wheel and drag scrolling for mouse users. */
+    .shelf-wrap { position: relative; }
+    .shelf-wrap.dragging .row-scroll { cursor: grabbing; scroll-behavior: auto; }
+    .shelf-wrap.dragging .chip { pointer-events: none; }
+    .shelf-arrow {
+        position: absolute; top: 0; bottom: 12px; z-index: 2;
+        width: 56px;
+        display: none; align-items: center;
+        font-size: 1.3rem; color: var(--text);
+    }
+    .shelf-arrow span {
+        width: 30px; height: 30px; border-radius: 50%;
+        background: var(--bg-3); border: 1px solid var(--line);
+        display: flex; align-items: center; justify-content: center;
+        line-height: 1;
+    }
+    .shelf-arrow:hover span { background: var(--accent); border-color: var(--accent); }
+    .shelf-arrow.left { left: 0; padding-left: 12px; background: linear-gradient(to right, var(--bg) 45%, transparent); }
+    .shelf-arrow.right { right: 0; padding-right: 12px; justify-content: flex-end; background: linear-gradient(to left, var(--bg) 45%, transparent); }
+    .shelf-arrow.show { display: flex; }
+    @media (hover: none) { .shelf-arrow { display: none !important; } }
 
     .group-label {
         align-self: center;
@@ -263,6 +292,7 @@
         opacity: 0; transition: opacity .2s;
     }
     .card:hover .heart, .heart.on { opacity: 1; }
+    @media (hover: none) { .heart { opacity: 1; } }
     .heart.on { color: var(--accent-2); }
 
     .card .title {
@@ -403,6 +433,9 @@
     }
     .toast.show { opacity: 1; transform: translateX(-50%); }
 
+    body.player-only { background: #000; }
+    body.player-only .pl [data-a="close"] { visibility: hidden; }
+
     @media (max-width: 760px) {
         .topbar-row { flex-wrap: wrap; padding: 10px 16px; gap: 10px; }
         .search { order: 3; flex-basis: 100%; }
@@ -432,7 +465,11 @@
         </div>
     </div>
     <nav class="row-scroll" id="sections"></nav>
-    <nav class="row-scroll shelves" id="shelves"></nav>
+    <div class="shelf-wrap" id="shelfWrap">
+        <button class="shelf-arrow left" id="shelfLeft" title="Scroll left"><span>‹</span></button>
+        <nav class="row-scroll shelves" id="shelves"></nav>
+        <button class="shelf-arrow right" id="shelfRight" title="Scroll right"><span>›</span></button>
+    </div>
 </header>
 
 <main>
@@ -468,6 +505,9 @@
 </div>
 <div class="toast" id="toast"></div>
 
+<script src="core.js"></script>
+<script src="mkv.js"></script>
+<script src="player-ui.js"></script>
 <script>
 // TMDB Read Access Token (used only for ratings, posters, plots and trailers)
 const TMDB_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI2MTM5MTcwZWNiZDRkMDlkZDhiNjEwMGMzMmQ4ZGMzZSIsIm5iZiI6MTc2NjM2NTE0My45MjUsInN1YiI6IjY5NDg5N2Q3ZDZmYjE4MTFiMDdhYzA1NSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.mGFIYeXIejioSNygClj_QfW-40LrtAG1OLquTUQhPn4';
@@ -478,8 +518,17 @@ const NEW_DAYS = 14;
 
 const $ = id => document.getElementById(id);
 
+// Inside the iPhone app (Scriptable) there is no server: window.MFNative does the network
+// requests, storage and link opening natively, and core.js runs right here in the page.
+const NATIVE = window.MFNative || null;
+const IS_IOS = !!NATIVE || /iPhone|iPad|iPod/.test(navigator.userAgent);
+const localCore = NATIVE && window.MFCore ? MFCore.createCore(NATIVE.post) : null;
+
 // ---------------- Persistent state ----------------
-const store = {
+const store = NATIVE ? {
+    get(key, fallback) { return key in NATIVE.store ? NATIVE.store[key] : fallback; },
+    set(key, value) { NATIVE.store[key] = value; NATIVE.save(key, value); }
+} : {
     get(key, fallback) {
         try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v); } catch { return fallback; }
     },
@@ -525,6 +574,11 @@ function fmtSize(bytes) {
     return `${bytes.toFixed(i >= 3 ? 2 : 0)} ${units[i]}`;
 }
 
+function openUrl(url) {
+    if (NATIVE) NATIVE.open(url);
+    else window.open(url, '_blank');
+}
+
 function toast(msg) {
     const t = $('toast');
     t.textContent = msg;
@@ -534,6 +588,17 @@ function toast(msg) {
 }
 
 async function api(path) {
+    if (localCore) {
+        const u = new URL(path, 'http://local');
+        const q = name => u.searchParams.get(name) || undefined;
+        switch (u.pathname) {
+            case '/sections': return localCore.sections();
+            case '/shelves': return localCore.shelves(q('section'));
+            case '/items': return localCore.items({ section: q('section'), url: q('url') });
+            case '/folder': return localCore.folder(q('url'));
+            case '/search': return localCore.search(q('q'), q('section'));
+        }
+    }
     const res = await fetch(API + path);
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
@@ -597,9 +662,10 @@ function tmdbCached(item) {
 }
 
 async function tmdbFetch(path) {
-    const res = await fetch('https://api.themoviedb.org/3' + path, {
-        headers: { Authorization: `Bearer ${TMDB_TOKEN}`, accept: 'application/json' }
-    });
+    const url = 'https://api.themoviedb.org/3' + path;
+    const headers = { Authorization: `Bearer ${TMDB_TOKEN}`, accept: 'application/json' };
+    if (NATIVE) return NATIVE.get(url, headers);
+    const res = await fetch(url, { headers });
     if (!res.ok) throw new Error('TMDB ' + res.status);
     return res.json();
 }
@@ -687,6 +753,7 @@ function renderShelves() {
     const section = currentSection();
     if (state.view !== 'section' || !section?.nested || !state.shelves.length) {
         nav.style.display = 'none';
+        updateShelfArrows();
         return;
     }
     nav.style.display = 'flex';
@@ -694,7 +761,57 @@ function renderShelves() {
     nav.innerHTML = state.shelves.map(s =>
         `<button class="chip${s.url === current ? ' active' : ''}" data-shelf="${esc(s.url)}" title="${esc(s.name)}">${esc(shelfLabel(s.name))}</button>`
     ).join('');
-    nav.querySelector('.chip.active')?.scrollIntoView({ inline: 'center', block: 'nearest' });
+    const active = nav.querySelector('.chip.active');
+    if (active) nav.scrollLeft = active.offsetLeft - nav.clientWidth / 2 + active.offsetWidth / 2;
+    requestAnimationFrame(updateShelfArrows);
+}
+
+function updateShelfArrows() {
+    const nav = $('shelves');
+    const visible = nav.style.display !== 'none';
+    $('shelfLeft').classList.toggle('show', visible && nav.scrollLeft > 4);
+    $('shelfRight').classList.toggle('show', visible && nav.scrollLeft + nav.clientWidth < nav.scrollWidth - 4);
+}
+
+// Mouse users: arrows, vertical wheel scrolls sideways, and click-and-drag.
+function enableRowScrolling(nav, wrap) {
+    nav.addEventListener('scroll', updateShelfArrows, { passive: true });
+    window.addEventListener('resize', updateShelfArrows);
+    $('shelfLeft').addEventListener('click', () => { nav.scrollLeft -= nav.clientWidth * 0.7; });
+    $('shelfRight').addEventListener('click', () => { nav.scrollLeft += nav.clientWidth * 0.7; });
+
+    nav.addEventListener('wheel', e => {
+        if (Math.abs(e.deltaY) <= Math.abs(e.deltaX) || nav.scrollWidth <= nav.clientWidth) return;
+        e.preventDefault();
+        nav.style.scrollBehavior = 'auto';
+        nav.scrollLeft += e.deltaY;
+        nav.style.scrollBehavior = '';
+    }, { passive: false });
+
+    let drag = null;
+    nav.addEventListener('pointerdown', e => {
+        if (e.pointerType !== 'mouse' || e.button !== 0) return;
+        drag = { x: e.clientX, left: nav.scrollLeft, moved: false };
+    });
+    window.addEventListener('pointermove', e => {
+        if (!drag) return;
+        const dx = e.clientX - drag.x;
+        if (!drag.moved && Math.abs(dx) > 5) {
+            drag.moved = true;
+            wrap.classList.add('dragging');
+        }
+        if (drag.moved) {
+            nav.style.scrollBehavior = 'auto';
+            nav.scrollLeft = drag.left - dx;
+        }
+    });
+    window.addEventListener('pointerup', () => {
+        if (!drag) return;
+        nav.style.scrollBehavior = '';
+        // Let the click that ends a drag fall through without selecting a year.
+        setTimeout(() => wrap.classList.remove('dragging'), 0);
+        drag = null;
+    });
 }
 
 // "(2025)" -> "2025", "TV Series ♥  A  —  L" -> "A – L", "DC ... (2008-2019) 720p & 1080p [Dual Audio]" -> "DC ... (2008-2019)"
@@ -886,7 +1003,7 @@ function cardHtml(item, index) {
         <div class="card" tabindex="0" data-i="${index}">
             <div class="poster">
                 <div class="ph">${esc(item.title)}</div>
-                ${poster ? `<img src="${esc(poster)}" alt="" loading="lazy" onload="this.classList.add('loaded')" onerror="this.remove()">` : ''}
+                ${poster ? `<img src="${esc(poster)}" alt="" loading="lazy" onload="this.classList.add('loaded')" onerror="posterFailed(this)">` : ''}
                 <div class="badges">${badges}</div>
                 <span class="rating">${t?.rating ? '★ ' + t.rating.toFixed(1) : ''}</span>
                 <button class="heart${isSaved(item) ? ' on' : ''}" data-action="heart" title="My List">${isSaved(item) ? '♥' : '♡'}</button>
@@ -931,6 +1048,17 @@ function cardsFor(item) {
     return idx < 0 ? [] : [...document.querySelectorAll(`.card[data-i="${idx}"]`)];
 }
 
+// A server poster that won't load falls back to the TMDB one.
+function posterFailed(img) {
+    const card = img.closest('.card');
+    img.remove();
+    const item = card && state.visible[+card.dataset.i];
+    if (!item || !item.poster || img.getAttribute('src') !== item.poster) return;
+    item.poster = null;
+    const t = tmdbCached(item);
+    if (t?.poster) setCardPoster(item, TMDB_IMG + 'w342' + t.poster);
+}
+
 function setCardPoster(item, src) {
     for (const card of cardsFor(item)) {
         const box = card.querySelector('.poster');
@@ -938,7 +1066,7 @@ function setCardPoster(item, src) {
         const img = document.createElement('img');
         img.alt = '';
         img.onload = () => img.classList.add('loaded');
-        img.onerror = () => img.remove();
+        img.onerror = () => posterFailed(img);
         img.src = src;
         box.querySelector('.ph').after(img);
     }
@@ -1089,8 +1217,8 @@ function renderModalInfo(item, t) {
         ${d.genres?.length ? `<div class="facts">${d.genres.map(g => `<span class="tag">${esc(g)}</span>`).join('')}</div>` : ''}
         <p class="overview">${esc(t?.overview || (t === null ? 'No description found on TMDB.' : 'Loading details…'))}</p>
         <div class="actions">
-            ${video ? `<button class="btn primary" data-action="download" data-url="${esc(video.url)}">⬇ Download${item.videos.length > 1 ? ' (1st file)' : ''}</button>` : ''}
-            ${video ? `<button class="btn white" data-action="vlc" title="Opens a playlist file - VLC streams it straight from the server">▶ Play in VLC</button>` : ''}
+            ${video ? `<button class="btn primary" data-action="play">▶ Play${resumeLabel(video.url)}</button>` : ''}
+            ${video ? `<button class="btn white" data-action="download" data-url="${esc(video.url)}">⬇ Download${item.videos.length > 1 ? ' (1st file)' : ''}</button>` : ''}
             <button class="btn" data-action="trailer">🎬 Trailer</button>
             ${video ? `<button class="btn" data-action="copy" data-url="${esc(video.url)}">🔗 Copy link</button>` : ''}
             <button class="btn" data-action="modal-heart">${saved ? '♥ In My List' : '♡ My List'}</button>
@@ -1129,12 +1257,13 @@ function renderFileList(entries) {
             <span class="fs">${fmtSize(e.size)}</span>
             ${e.type === 'folder'
                 ? '<span class="fs">›</span>'
-                : `<button class="mini" data-action="copy" data-url="${esc(e.url)}" title="Copy link">🔗</button>
-                   <button class="mini" data-action="download" data-url="${esc(e.url)}">⬇ Download</button>`}
+                : `${e.type === 'video' ? `<button class="mini" data-action="play-file" data-i="${i}" title="Play">▶ Play</button>` : ''}
+                   <button class="mini" data-action="copy" data-url="${esc(e.url)}" title="Copy link">🔗</button>
+                   <button class="mini" data-action="download" data-url="${esc(e.url)}">⬇${IS_IOS ? '' : ' Download'}</button>`}
         </div>`).join('');
     $('mFiles').innerHTML = `
         <h3>Files ${crumbs}
-            ${videos.length > 1 ? `<button class="mini btn" style="margin-left:auto;padding:6px 12px" data-action="vlc-all">▶ Play all ${videos.length} in VLC</button>` : ''}
+            ${videos.length > 1 ? `<button class="mini btn" style="margin-left:auto;padding:6px 12px" data-action="play-all">▶ Play all ${videos.length}</button>` : ''}
         </h3>
         <div class="file-list">${rows || '<div class="file"><span class="fn" style="color:var(--muted)">Empty folder</span></div>'}</div>`;
     $('mFiles').entries = entries;
@@ -1150,7 +1279,12 @@ function closeModal() {
 function playTrailer(item) {
     if (!item.trailerKey) {
         const q = `${item.title} ${item.year || ''} ${item.tv ? 'series' : ''} trailer`;
-        window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`, '_blank');
+        openUrl(`https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`);
+        return;
+    }
+    if (NATIVE) {
+        // Embedded YouTube refuses to play inside the iPhone app's web view; hand it to YouTube.
+        openUrl(`https://www.youtube.com/watch?v=${encodeURIComponent(item.trailerKey)}`);
         return;
     }
     const hero = $('hero');
@@ -1160,29 +1294,61 @@ function playTrailer(item) {
         `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(item.trailerKey)}?autoplay=1&rel=0" allow="autoplay; encrypted-media; fullscreen" allowfullscreen></iframe>`);
 }
 
-// A tiny .m3u playlist lets VLC (or any player) stream the file straight from the server.
-function playInVlc(files, name) {
-    const body = '#EXTM3U\n' + files.map(f => `#EXTINF:-1,${f.name}\n${f.url}`).join('\n') + '\n';
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([body], { type: 'audio/x-mpegurl' }));
-    a.download = name.replace(/[\\/:*?"<>|]+/g, ' ').trim() + '.m3u';
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-    toast('Playlist saved - open it to stream in VLC');
+// "· Resume 12:34" on the Play button when this file was watched part-way.
+function resumeLabel(url) {
+    const r = store.get('mf:resume', {})[url];
+    return r && r.t > 30 && (!r.d || r.t < r.d - 120) ? ` · Resume ${fmtClock(r.t)}` : '';
+}
+
+function fmtClock(s) {
+    const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, sec = Math.floor(s % 60);
+    return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(sec).padStart(2, '0');
+}
+
+// Opens the built-in player. playlist: [{ name, url }]; subtitle files in the same folder are offered too.
+function playVideos(title, playlist, index = 0, folderEntries = []) {
+    const media = {
+        title,
+        playlist: playlist.map(f => ({ name: f.name.replace(/\.\w+$/, ''), url: f.url })),
+        index: Math.max(0, index),
+        subFiles: folderEntries.filter(e => e.type === 'subtitle').map(e => ({ name: e.name, url: e.url }))
+    };
+    if (window.MF_PLAYER_ONLY) {
+        // iPhone player view: the in-browser MKV engine reads the file directly (same server address).
+        return MFPlayer.open({
+            engine: 'mse',
+            store,
+            fetchRange: url => MFMse.httpRange(url),
+            fallback: file => openUrl(`vlc-x-callback://x-callback-url/stream?url=${encodeURIComponent(file.url)}`)
+        }, media);
+    }
+    if (NATIVE) {
+        // On iPhone the player opens in its own view on the movie server's address (see build-ios.js).
+        NATIVE.play(media);
+        return;
+    }
+    MFPlayer.open({
+        engine: 'server',
+        store,
+        onClose: () => { if (modalItem) renderModalInfo(modalItem, tmdbCached(modalItem)); }
+    }, media);
 }
 
 async function copyLink(url) {
     try {
-        await navigator.clipboard.writeText(url);
+        if (NATIVE) NATIVE.copy(url);
+        else await navigator.clipboard.writeText(url);
     } catch {
         const ta = document.createElement('textarea');
         ta.value = url;
+        ta.setAttribute('readonly', '');
         document.body.appendChild(ta);
         ta.select();
+        ta.setSelectionRange(0, url.length);
         document.execCommand('copy');
         ta.remove();
     }
-    toast('Link copied - paste into VLC (Ctrl+N) or your download manager');
+    toast(IS_IOS ? 'Link copied' : 'Link copied - paste it into your download manager');
 }
 
 // ---------------- Events ----------------
@@ -1231,9 +1397,22 @@ document.addEventListener('click', e => {
             closeModal();
             break;
         case 'download':
-            window.open(el.dataset.url, '_blank');
-            toast('Download started');
+            openUrl(el.dataset.url);
+            toast(NATIVE ? 'Opening in Safari - tap Download there' : 'Download started');
             break;
+        case 'play': {
+            const here = $('mFiles').entries || [];
+            playVideos(item.title, item.videos, 0, modalPath.length === 1 ? here : []);
+            break;
+        }
+        case 'play-file':
+        case 'play-all': {
+            const entries = $('mFiles').entries || [];
+            const vids = entries.filter(f => f.type === 'video');
+            const file = action === 'play-file' ? entries[+el.dataset.i] : vids[0];
+            playVideos(item.title, vids, vids.indexOf(file), entries);
+            break;
+        }
         case 'copy':
             e.stopPropagation();
             copyLink(el.dataset.url);
@@ -1241,20 +1420,12 @@ document.addEventListener('click', e => {
         case 'trailer':
             playTrailer(item);
             break;
-        case 'vlc':
-            playInVlc(item.videos, item.title);
-            break;
-        case 'vlc-all': {
-            const vids = ($('mFiles').entries || []).filter(f => f.type === 'video');
-            playInVlc(vids, `${item.title} - ${modalPath[modalPath.length - 1].name}`);
-            break;
-        }
         case 'modal-heart':
             toggleSaved(item);
             renderModalInfo(item, tmdbCached(item));
             break;
         case 'open-folder':
-            window.open(modalPath[modalPath.length - 1].url, '_blank');
+            openUrl(modalPath[modalPath.length - 1].url);
             break;
         case 'enter': {
             const entry = $('mFiles').entries[+el.dataset.i];
@@ -1341,7 +1512,16 @@ $('sort').addEventListener('change', e => {
 
 // ---------------- Start ----------------
 async function init() {
+    if (window.MF_PLAYER_ONLY) {
+        // iPhone player view: just the player (Scriptable's own Close button leaves it).
+        const p = window.MF_PLAYER_ONLY;
+        document.body.classList.add('player-only');
+        playVideos(p.title, p.playlist, p.index, p.subFiles.map(f => ({ ...f, type: 'subtitle' })));
+        return;
+    }
     updateMyListCount();
+    enableRowScrolling($('shelves'), $('shelfWrap'));
+    if (matchMedia('(max-width: 760px)').matches) $('search').placeholder = 'Search · Enter searches everywhere';
     try {
         state.sections = await api('/sections');
         $('statusDot').className = 'status-dot ok';
@@ -1349,7 +1529,7 @@ async function init() {
     } catch (err) {
         $('statusDot').className = 'status-dot bad';
         $('statusDot').title = 'App server not responding';
-        showError(new Error('The Movie Fetcher server is not running. Start it with "Start Movie Fetcher".'));
+        showError(new Error('The Movie Fetcher server is not running. Start it from the "DHAKA FLIX Movies" shortcut.'));
         return;
     }
     if (!state.sections.some(s => s.id === prefs.section)) prefs.section = state.sections[0].id;
