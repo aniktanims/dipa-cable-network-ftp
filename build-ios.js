@@ -6,47 +6,46 @@ const path = require('path');
 const read = f => fs.readFileSync(path.join(__dirname, f), 'utf8');
 const html = read('index.html');
 
-// Page side of the bridge. The page queues requests; the Scriptable side collects them with
-// one evaluateJavaScript call at a time, does them natively, and hands back the results.
+// Page side of the bridge. The page queues requests; the Scriptable side picks them up with a
+// quick evaluateJavaScript call every few milliseconds, does them natively and hands back results.
+// Errors are shown on screen, since there's no developer console on the phone.
 const bridge = `
 window.MF_PLAYER_ONLY = __MF_PLAYER__;
-window.MFNative = (() => {
-    let seq = 0, waiter = null, timer = null, queue = [];
-    const pending = new Map();
-    function flush() {
-        if (!waiter || !queue.length) return;
-        const w = waiter;
-        waiter = null;
-        clearTimeout(timer);
-        w(queue.splice(0));
+window.__mfShowError = msg => {
+    let box = document.getElementById('mf-errors');
+    if (!box) {
+        box = document.createElement('pre');
+        box.id = 'mf-errors';
+        box.style.cssText = 'position:fixed;left:8px;right:8px;bottom:8px;z-index:9999;background:#b00020;color:#fff;'
+            + 'padding:10px;border-radius:8px;font:12px/1.4 monospace;white-space:pre-wrap;max-height:40vh;overflow:auto';
+        (document.body || document.documentElement).appendChild(box);
     }
+    box.textContent += msg + String.fromCharCode(10);
+};
+window.addEventListener('error', e => __mfShowError('Error: ' + e.message + (e.lineno ? ' (line ' + e.lineno + ')' : '')));
+window.addEventListener('unhandledrejection', e => __mfShowError('Error: ' + ((e.reason && e.reason.message) || e.reason)));
+window.MFNative = (() => {
+    let seq = 0, queue = [];
+    const pending = new Map();
     function call(type, args) {
         return new Promise((resolve, reject) => {
             const id = ++seq;
             pending.set(id, { resolve, reject });
             queue.push(Object.assign({ id, type }, args));
-            flush();
         });
     }
     function fire(type, args) {
         queue.push(Object.assign({ id: 0, type }, args));
-        flush();
     }
-    // busy: native requests are still running, so check back shortly even if nothing new is queued.
-    window.__mfNext = (results, busy, completion) => {
+    // Called by the Scriptable side: delivers finished results, returns the new requests.
+    window.__mfNext = results => {
         for (const r of results) {
             const p = pending.get(r.id);
             if (!p) continue;
             pending.delete(r.id);
             r.ok ? p.resolve(r.value) : p.reject(new Error(r.error));
         }
-        waiter = completion;
-        if (queue.length) return flush();
-        if (busy) timer = setTimeout(() => {
-            if (waiter !== completion) return;
-            waiter = null;
-            completion([]);
-        }, 100);
+        return queue.splice(0);
     };
     return {
         store: __MF_STORE__,
@@ -135,18 +134,24 @@ function saveData() {
 }
 
 // Serve one web view's requests until it is closed.
-async function serve(web, presented) {
+const sleep = ms => new Promise(resolve => Timer.schedule(ms, false, resolve));
+
+async function serve(web, presented, name) {
     let closed = false;
     presented.then(() => { closed = true; saveData(); });
     const ready = [];
-    let inflight = 0;
+    let inflight = 0, errors = 0;
     while (!closed) {
         let batch;
         try {
-            batch = await web.evaluateJavaScript(
-                '__mfNext(' + JSON.stringify(ready.splice(0)) + ', ' + (inflight > 0) + ', completion)', true);
+            batch = await web.evaluateJavaScript('__mfNext(' + JSON.stringify(ready.splice(0)) + ')');
+            errors = 0;
         } catch (e) {
-            break;
+            // The page may still be starting; give up only if it keeps failing.
+            if (++errors === 1 || errors % 50 === 0) console.log(name + ' bridge: ' + e);
+            if (errors > 600) break;
+            await sleep(100);
+            continue;
         }
         for (const req of batch || []) {
             inflight++;
@@ -159,6 +164,7 @@ async function serve(web, presented) {
                 });
         }
         saveData();
+        if (!(batch && batch.length) && !ready.length) await sleep(inflight ? 30 : 80);
     }
 }
 
@@ -169,14 +175,25 @@ async function openPlayer(media) {
     const origin = file.url.match(/^https?:\\/\\/[^/]+\\//)[0];
     const web = new WebView();
     await web.loadHTML(pageHtml(media), origin);
-    serve(web, web.present(true));
+    serve(web, web.present(true), 'player');
 }
 
-const main = new WebView();
-await main.loadHTML(pageHtml(null));
-const mainClosed = main.present(true);
-mainClosed.then(() => { saveData(); Script.complete(); });
-await serve(main, mainClosed);
+try {
+    console.log('Movie Fetcher: loading page (' + Math.round(PAGE.length / 1024) + ' KB)');
+    const main = new WebView();
+    await main.loadHTML(pageHtml(null));
+    console.log('Movie Fetcher: page loaded');
+    const mainClosed = main.present(true);
+    mainClosed.then(() => { saveData(); Script.complete(); });
+    await serve(main, mainClosed, 'main');
+} catch (e) {
+    console.error('Movie Fetcher failed: ' + e);
+    const a = new Alert();
+    a.title = 'Movie Fetcher';
+    a.message = String(e);
+    a.addAction('OK');
+    await a.present();
+}
 `;
 
 fs.mkdirSync(path.join(__dirname, 'ios'), { recursive: true });
