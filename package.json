@@ -1,7 +1,7 @@
 {
   "name": "movie-fetcher",
   "version": "2.1.0",
-  "description": "Browse, stream and download movies and series from DHAKA FLIX",
+  "description": "Dipa Cable Network FTP: browse, stream and download movies and series from DHAKA FLIX",
   "main": "electron.js",
   "scripts": {
     "start": "node server.js",
@@ -11,7 +11,7 @@
   },
   "build": {
     "appId": "com.dhakaflix.moviefetcher",
-    "productName": "DHAKA FLIX Movie Fetcher",
+    "productName": "Dipa Cable Network FTP",
     "asar": true,
     "compression": "maximum",
     "electronDownload": {
@@ -26,7 +26,7 @@
       "icon": "build/icon.png"
     },
     "portable": {
-      "artifactName": "MovieFetcher-Portable-${version}.exe"
+      "artifactName": "DipaCableNetworkFTP-Portable-${version}.exe"
     },
     "files": [
       "electron.js",
@@ -36,7 +36,8 @@
       "mkv.js",
       "player-ui.js",
       "index.html",
-      "package.json"
+      "package.json",
+      "assets/**"
     ],
     "asarUnpack": [
       "node_modules/ffmpeg-static/**"

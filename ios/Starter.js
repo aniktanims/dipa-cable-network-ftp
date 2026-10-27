@@ -25,7 +25,7 @@ if (!/^https:\/\//.test(APP_URL)) {
         const req = new Request(latest + '?t=' + Date.now());
         req.timeoutInterval = 15;
         const text = await req.loadString();
-        if (text.includes('DHAKA FLIX Movie Fetcher for iPhone')) {
+        if (text.includes('Movie Fetcher for iPhone')) {
             code = text;
             fm.writeString(saved, text);
         }

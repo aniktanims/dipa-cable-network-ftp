@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>DHAKA FLIX Movie Fetcher</title>
+<title>Dipa Cable Network FTP</title>
 <style>
     :root {
         --bg: #0d0f14;
@@ -58,13 +58,30 @@
     }
 
     .logo {
-        font-weight: 800;
-        font-size: 1.35rem;
-        letter-spacing: .5px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
         white-space: nowrap;
         cursor: pointer;
+        flex: none;
     }
-    .logo span { color: var(--accent); }
+    /* The light outline keeps the logo's black "NETWORK" lettering readable on the dark bar. */
+    .logo img {
+        height: 62px;
+        width: auto;
+        display: block;
+        filter: drop-shadow(0 0 1px rgba(255, 255, 255, .95)) drop-shadow(0 0 1px rgba(255, 255, 255, .7));
+    }
+    .logo .ftp {
+        font-weight: 800;
+        font-size: .72rem;
+        letter-spacing: .6px;
+        line-height: 1.15;
+        color: var(--muted);
+        border-left: 1px solid var(--line);
+        padding-left: 10px;
+    }
+    .logo .ftp span { color: var(--accent); }
 
     .search {
         flex: 1;
@@ -454,6 +471,7 @@
     body.player-only .pl [data-a="close"] { visibility: hidden; }
 
     @media (max-width: 760px) {
+        .logo img { height: 50px; }
         .topbar-row { flex-wrap: wrap; padding: 10px 16px; gap: 10px; }
         .search { order: 3; flex-basis: 100%; }
         .search kbd { display: none; }
@@ -470,7 +488,10 @@
 <body>
 <header class="topbar">
     <div class="topbar-row">
-        <div class="logo" id="logo" title="Home">DHAKA<span>FLIX</span></div>
+        <div class="logo" id="logo" title="Home">
+            <img src="assets/logo.png" alt="Dipa Cable TV Network">
+            <div class="ftp">DHAKA<span>FLIX</span><br>FTP</div>
+        </div>
         <div class="search">
             <span class="icon">⌕</span>
             <input id="search" type="search" placeholder="Filter this list · press Enter to search everywhere" autocomplete="off">
@@ -1510,7 +1531,7 @@ const CREDIT = {
     name: 'Mostofa Tanim Anik',
     title: 'Senior Software Engineer',
     links: [
-        { label: 'GitHub', url: '' },
+        { label: 'GitHub', url: 'https://github.com/aniktanims' },
         { label: 'LinkedIn', url: '' },
         { label: 'Facebook', url: '' }
     ]

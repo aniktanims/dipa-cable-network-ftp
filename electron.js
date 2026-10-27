@@ -1,7 +1,12 @@
 const { app, BrowserWindow, shell } = require('electron');
 const path = require('path');
+const fs = require('fs');
 
 const APP_URL = 'http://localhost:8000/';
+
+// The app was called "DHAKA FLIX Movie Fetcher" before; keep using that data folder so
+// My List, resume positions and settings carry over.
+app.setPath('userData', path.join(app.getPath('appData'), 'DHAKA FLIX Movie Fetcher'));
 
 let mainWindow;
 
@@ -31,6 +36,15 @@ if (!app.requestSingleInstanceLock()) {
     app.on('window-all-closed', () => app.quit());
 }
 
+// The splash screen is a data: page, so the logo goes in as a data URL.
+function logoDataUrl() {
+    try {
+        return 'data:image/png;base64,' + fs.readFileSync(path.join(__dirname, 'assets', 'logo.png')).toString('base64');
+    } catch (e) {
+        return '';
+    }
+}
+
 function createWindow() {
     mainWindow = new BrowserWindow({
         width: 1400,
@@ -39,7 +53,7 @@ function createWindow() {
         minHeight: 560,
         backgroundColor: '#0d0f14',
         autoHideMenuBar: true,
-        title: 'DHAKA FLIX Movie Fetcher',
+        title: 'Dipa Cable Network FTP',
         webPreferences: {
             contextIsolation: true,
             nodeIntegration: false
@@ -50,8 +64,8 @@ function createWindow() {
         <body style="margin:0;height:100vh;display:flex;align-items:center;justify-content:center;
                      background:#0d0f14;color:#eef0f5;font-family:'Segoe UI',sans-serif">
             <div style="text-align:center">
-                <div style="font-size:2.4rem;font-weight:800;letter-spacing:.5px">DHAKA<span style="color:#e50914">FLIX</span></div>
-                <div style="margin-top:10px;font-size:.85rem;color:#8d93a5">by Mostofa Tanim Anik · Senior Software Engineer</div>
+                <img src="${logoDataUrl()}" style="width:320px;filter:drop-shadow(0 0 1px #fff)">
+                <div style="margin-top:14px;font-size:.85rem;color:#8d93a5">by Mostofa Tanim Anik · Senior Software Engineer</div>
             </div>
         </body>`));
 

@@ -1,8 +1,10 @@
-# DHAKA FLIX Movie Fetcher
+# Dipa Cable Network FTP
 
 Browse, stream and download movies and series from the DHAKA FLIX servers (172.16.50.x) on Windows and iPhone.
 
-Made by **Mostofa Tanim Anik**, Senior Software Engineer.
+Made by **Mostofa Tanim Anik**, Senior Software Engineer · [GitHub](https://github.com/aniktanims)
+
+An unofficial app for browsing the DHAKA FLIX FTP servers, for Dipa Cable TV Network users.
 
 - Every section (English, Hindi, South Indian, Animation, TV series, Korean, Anime, ...) with year / A–Z shelves
 - Opens on the newest year and remembers where you left off
@@ -17,8 +19,8 @@ Needs a connection that can reach the DHAKA FLIX servers.
 
 | How | Command |
 | --- | --- |
-| Desktop app | `dist/win-unpacked/DHAKA FLIX Movie Fetcher.exe` (or the desktop shortcut) |
-| Portable app | `dist/MovieFetcher-Portable.exe` |
+| Desktop app | `dist/win-unpacked/Dipa Cable Network FTP.exe` (or the desktop shortcut) |
+| Portable app | `dist/DipaCableNetworkFTP-Portable-<version>.exe` |
 | In the browser | `start.bat` or `npm start`, then open http://localhost:8000 |
 | Dev mode | `run-dev.bat` or `npm run dev` |
 | Rebuild the app | `build.bat` |

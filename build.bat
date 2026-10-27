@@ -2,7 +2,7 @@
 echo.
 echo ========================================
 echo   Building Windows Desktop EXE (Electron)
-echo   DHAKA FLIX Movie Fetcher
+echo   Dipa Cable Network FTP
 echo ========================================
 echo.
 
@@ -22,16 +22,16 @@ echo This may take a few minutes...
 call npm run build
 echo.
 
-if exist "dist\MovieFetcher-Portable-*.exe" (
+if exist "dist\DipaCableNetworkFTP-Portable-*.exe" (
     echo.
     echo ========================================
     echo   BUILD SUCCESSFUL!
     echo ========================================
     echo.
     echo Your executable is ready:
-    echo   Location: dist\MovieFetcher-Portable-*.exe
+    echo   Location: dist\DipaCableNetworkFTP-Portable-*.exe
     echo.
-    echo Just double-click MovieFetcher-Portable-*.exe to run!
+    echo Just double-click DipaCableNetworkFTP-Portable-*.exe to run!
     echo.
     goto :done
 )
