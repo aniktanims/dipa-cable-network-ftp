@@ -2,6 +2,8 @@
 
 Browse, stream and download movies and series from the DHAKA FLIX servers (172.16.50.x) on Windows and iPhone.
 
+Made by **Mostofa Tanim Anik**, Senior Software Engineer.
+
 - Every section (English, Hindi, South Indian, Animation, TV series, Korean, Anime, ...) with year / A–Z shelves
 - Opens on the newest year and remembers where you left off
 - Instant filter, plus search across all sections (press Enter)

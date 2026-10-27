@@ -49,7 +49,10 @@ function createWindow() {
     mainWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(`
         <body style="margin:0;height:100vh;display:flex;align-items:center;justify-content:center;
                      background:#0d0f14;color:#eef0f5;font-family:'Segoe UI',sans-serif">
-            <div style="font-size:2.4rem;font-weight:800;letter-spacing:.5px">DHAKA<span style="color:#e50914">FLIX</span></div>
+            <div style="text-align:center">
+                <div style="font-size:2.4rem;font-weight:800;letter-spacing:.5px">DHAKA<span style="color:#e50914">FLIX</span></div>
+                <div style="margin-top:10px;font-size:.85rem;color:#8d93a5">by Mostofa Tanim Anik · Senior Software Engineer</div>
+            </div>
         </body>`));
 
     // Downloads, folders and YouTube links open in the normal browser / download manager.

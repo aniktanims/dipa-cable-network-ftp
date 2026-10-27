@@ -1,12 +1,12 @@
 {
   "name": "movie-fetcher",
   "version": "2.1.0",
-  "description": "DHAKA FLIX Movie Fetcher",
+  "description": "Browse, stream and download movies and series from DHAKA FLIX",
   "main": "electron.js",
   "scripts": {
     "start": "node server.js",
     "dev": "electron .",
-    "build": "electron-builder --win portable dir",
+    "build": "electron-builder --win portable",
     "build:ios": "node build-ios.js"
   },
   "build": {
@@ -22,10 +22,11 @@
         {
           "target": "portable"
         }
-      ]
+      ],
+      "icon": "build/icon.png"
     },
     "portable": {
-      "artifactName": "MovieFetcher-Portable.exe"
+      "artifactName": "MovieFetcher-Portable-${version}.exe"
     },
     "files": [
       "electron.js",
@@ -39,7 +40,11 @@
     ],
     "asarUnpack": [
       "node_modules/ffmpeg-static/**"
-    ]
+    ],
+    "copyright": "Copyright © 2026 Mostofa Tanim Anik",
+    "directories": {
+      "buildResources": "build"
+    }
   },
   "dependencies": {
     "axios": "^1.6.0",
@@ -50,5 +55,8 @@
   "devDependencies": {
     "electron": "^28.3.3",
     "electron-builder": "^24.13.3"
+  },
+  "author": {
+    "name": "Mostofa Tanim Anik"
   }
 }

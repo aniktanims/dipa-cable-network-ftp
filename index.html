@@ -304,6 +304,23 @@
 
     .sentinel { height: 1px; }
 
+    .credit {
+        margin-top: 48px;
+        padding-top: 22px;
+        border-top: 1px solid var(--line);
+        text-align: center;
+        color: var(--muted);
+        font-size: .85rem;
+        line-height: 1.7;
+    }
+    .credit b { color: var(--text); font-weight: 600; }
+    .credit .links { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    .credit a {
+        color: var(--text); text-decoration: none;
+        border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; font-size: .8rem;
+    }
+    .credit a:hover { border-color: var(--accent); }
+
     /* ---------- States ---------- */
     .state {
         text-align: center;
@@ -498,6 +515,7 @@
     <div class="grid" id="grid"></div>
     <div class="sentinel" id="sentinel"></div>
     <div id="state"></div>
+    <footer class="credit" id="credit"></footer>
 </main>
 
 <div class="modal-bg" id="modalBg">
@@ -1486,6 +1504,33 @@ $('logo').addEventListener('click', () => {
     openSection(prefs.section);
 });
 
+// ---------------- Credit ----------------
+// Links with an empty url are left out.
+const CREDIT = {
+    name: 'Mostofa Tanim Anik',
+    title: 'Senior Software Engineer',
+    links: [
+        { label: 'GitHub', url: '' },
+        { label: 'LinkedIn', url: '' },
+        { label: 'Facebook', url: '' }
+    ]
+};
+
+function renderCredit() {
+    const links = CREDIT.links.filter(l => l.url)
+        .map(l => `<a href="${esc(l.url)}" data-action="external">${esc(l.label)}</a>`).join('');
+    $('credit').innerHTML = `
+        Made with ♥ by <b>${esc(CREDIT.name)}</b> · ${esc(CREDIT.title)}
+        ${links ? `<div class="links">${links}</div>` : ''}`;
+}
+
+$('credit').addEventListener('click', e => {
+    const a = e.target.closest('a[data-action="external"]');
+    if (!a) return;
+    e.preventDefault();
+    openUrl(a.href);
+});
+
 function bindToggle(id, key) {
     const el = $(id);
     el.classList.toggle('on', !!prefs[key]);
@@ -1520,6 +1565,7 @@ async function init() {
         return;
     }
     updateMyListCount();
+    renderCredit();
     enableRowScrolling($('shelves'), $('shelfWrap'));
     if (matchMedia('(max-width: 760px)').matches) $('search').placeholder = 'Search · Enter searches everywhere';
     try {
