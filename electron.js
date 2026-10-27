@@ -11,6 +11,16 @@ app.setPath('userData', path.join(app.getPath('appData'), 'DHAKA FLIX Movie Fetc
 
 let mainWindow;
 let updating = false;
+let appUrl = null;
+
+// Problems on other people's PCs end up in %APPDATA%\DHAKA FLIX Movie Fetcher\app.log.
+function log(text) {
+    try {
+        fs.appendFileSync(path.join(app.getPath('userData'), 'app.log'), `[${new Date().toISOString()}] v${app.getVersion()} ${text}\n`);
+    } catch (e) { /* logging must never break the app */ }
+}
+process.on('uncaughtException', err => log('Uncaught: ' + (err && err.stack || err)));
+process.on('unhandledRejection', err => log('Unhandled: ' + (err && err.stack || err)));
 
 // Only one copy of the app at a time; a second launch just focuses the first.
 if (!app.requestSingleInstanceLock()) {
@@ -26,13 +36,27 @@ if (!app.requestSingleInstanceLock()) {
         createWindow();
         // The Express server runs inside this process, so Node.js doesn't need to be installed.
         // It uses port 8000, or the next free one if another program has it.
-        const serverReady = require(path.join(__dirname, 'server.js')).ready;
+        let serverReady;
+        try {
+            serverReady = require(path.join(__dirname, 'server.js')).ready;
+        } catch (err) {
+            serverReady = Promise.reject(err);
+        }
 
-        // A newer version must be installed before the app can be used.
-        const update = await updater.check();
+        // A newer version must be installed before the app can be used. Without internet the
+        // check gives up after a few seconds so the app still opens.
+        const update = await Promise.race([updater.check(), new Promise(r => setTimeout(() => r(null), 6000))]);
         if (update) return runUpdate(update);
-        const port = await serverReady.catch(() => 8000);
-        if (!updating) mainWindow.loadURL(`http://localhost:${port}/`);
+        let port;
+        try {
+            port = await serverReady;
+        } catch (err) {
+            log('Server failed: ' + (err && err.stack || err));
+            return showError(`The app's built-in server could not start (${err.message || err}).`);
+        }
+        // 127.0.0.1 rather than "localhost", which some PCs resolve to IPv6 first.
+        appUrl = `http://127.0.0.1:${port}/`;
+        if (!updating) mainWindow.loadURL(appUrl);
         setInterval(async () => {
             if (updating) return;
             const later = await updater.check();
@@ -64,7 +88,16 @@ function screen(inner) {
         </body>`);
 }
 
-const BUTTON = 'display:inline-block;margin:6px;padding:10px 18px;border-radius:8px;color:#fff;text-decoration:none;font-weight:600';
+function showError(message) {
+    if (!mainWindow) return;
+    mainWindow.loadURL(screen(`
+        <h2 style="margin:22px 0 8px">Something went wrong</h2>
+        <p style="color:#c9cdd8;line-height:1.5">${String(message).replace(/[<>&]/g, '')}</p>
+        <a href="mfupdate://reload" style="${BUTTON};background:#e50914">Try again</a>
+        <p style="color:#8d93a5;font-size:.78rem;margin-top:14px">Details are saved in %APPDATA%\\DHAKA FLIX Movie Fetcher\\app.log</p>`));
+}
+
+const BUTTON ='display:inline-block;margin:6px;padding:10px 18px;border-radius:8px;color:#fff;text-decoration:none;font-weight:600';
 
 async function runUpdate({ version }) {
     updating = true;
@@ -118,12 +151,31 @@ function createWindow() {
 
     mainWindow.loadURL(screen(''));
 
-    // Buttons on the update screens.
+    // Buttons on the update and error screens.
     mainWindow.webContents.on('will-navigate', (event, url) => {
         if (!url.startsWith('mfupdate://')) return;
         event.preventDefault();
         if (url.startsWith('mfupdate://retry')) runUpdate({ version: mainWindow.retryVersion });
+        else if (url.startsWith('mfupdate://reload')) {
+            if (appUrl) {
+                mainWindow.loadURL(appUrl);
+            } else {
+                app.relaunch();
+                app.exit(0);
+            }
+        }
         else shell.openExternal(updater.RELEASES_URL);
+    });
+
+    // A crashed or failed page gets a visible message instead of a blank window.
+    mainWindow.webContents.on('render-process-gone', (event, details) => {
+        log('Page crashed: ' + details.reason);
+        if (details.reason !== 'clean-exit') showError('The app window stopped unexpectedly.');
+    });
+    mainWindow.webContents.on('did-fail-load', (event, code, description, url, isMainFrame) => {
+        if (!isMainFrame || url.startsWith('data:')) return;
+        log(`Load failed: ${code} ${description} ${url}`);
+        showError(`The app page could not load (${description}).`);
     });
 
     // Downloads, folders and YouTube links open in the normal browser / download manager.
