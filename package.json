@@ -1,6 +1,6 @@
 {
   "name": "movie-fetcher",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "Dipa Cable Network FTP: browse, stream and download movies and series from DHAKA FLIX",
   "main": "electron.js",
   "scripts": {

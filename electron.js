@@ -3,7 +3,6 @@ const path = require('path');
 const fs = require('fs');
 const updater = require('./updater');
 
-const APP_URL = 'http://localhost:8000/';
 const UPDATE_CHECK_INTERVAL = 30 * 60 * 1000;
 
 // The app was called "DHAKA FLIX Movie Fetcher" before; keep using that data folder so
@@ -26,18 +25,14 @@ if (!app.requestSingleInstanceLock()) {
     app.whenReady().then(async () => {
         createWindow();
         // The Express server runs inside this process, so Node.js doesn't need to be installed.
-        const server = require(path.join(__dirname, 'server.js'));
-        const serverReady = server.listening ? Promise.resolve() : new Promise(resolve => {
-            server.once('listening', resolve);
-            // Port already taken means another copy of the server is running; use it.
-            server.once('error', resolve);
-        });
+        // It uses port 8000, or the next free one if another program has it.
+        const serverReady = require(path.join(__dirname, 'server.js')).ready;
 
         // A newer version must be installed before the app can be used.
         const update = await updater.check();
         if (update) return runUpdate(update);
-        await serverReady;
-        if (!updating) mainWindow.loadURL(APP_URL);
+        const port = await serverReady.catch(() => 8000);
+        if (!updating) mainWindow.loadURL(`http://localhost:${port}/`);
         setInterval(async () => {
             if (updating) return;
             const later = await updater.check();

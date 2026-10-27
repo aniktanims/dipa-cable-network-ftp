@@ -39,19 +39,40 @@ app.get('/api/folder', handle(req => core.folder(req.query.url)));
 player.register(app);
 app.get('/api/search', handle(req => core.search(req.query.q, req.query.section)));
 
-const server = app.listen(PORT, () => {
-    console.log('\n🎬 Movie Fetcher Server running!');
-    console.log(`📂 Open http://localhost:${PORT}/ in your browser`);
-    console.log('\nPress Ctrl+C to stop the server\n');
-});
+// Is one of our own servers already answering on this port (e.g. started with start.bat)?
+function isOurServer(port) {
+    return new Promise(resolve => {
+        const req = require('http').get({ host: '127.0.0.1', port, path: '/api/sections', timeout: 1500 }, res => {
+            let body = '';
+            res.on('data', d => { body += d; });
+            res.on('end', () => resolve(body.includes('"english"')));
+        });
+        req.on('error', () => resolve(false));
+        req.on('timeout', () => { req.destroy(); resolve(false); });
+    });
+}
 
-server.on('error', err => {
-    if (err.code === 'EADDRINUSE') {
-        // Another copy is already serving the app on this port; reuse it.
-        console.log(`Port ${PORT} already in use - using the running server.`);
-    } else {
-        console.error('Server error:', err.message);
-    }
+// Listen on 8000, or the next free port if another program already uses it.
+// Resolves to the port the app is reachable on.
+const ready = new Promise((resolve, reject) => {
+    const tryPort = port => {
+        const server = app.listen(port, '127.0.0.1');
+        server.once('listening', () => {
+            console.log('Dipa Cable Network FTP server running');
+            console.log(`Open http://localhost:${port}/ in your browser (Ctrl+C to stop)`);
+            resolve(port);
+        });
+        server.once('error', async err => {
+            if (err.code !== 'EADDRINUSE' || port >= PORT + 20) return reject(err);
+            if (await isOurServer(port)) {
+                console.log(`Port ${port} already has Movie Fetcher running - using it.`);
+                return resolve(port);
+            }
+            tryPort(port + 1);
+        });
+    };
+    tryPort(PORT);
 });
+ready.catch(err => console.error('Server error:', err.message));
 
-module.exports = server;
+module.exports = { ready };

@@ -33,15 +33,29 @@ async function fetchWithTimeout(url, ms) {
     }
 }
 
+// Version of the newest release. Each release carries a small version.json, fetched through the
+// …/releases/latest/download/ link (served by GitHub's file CDN, so there's no API rate limit for
+// the many users who may share one internet address). The API is only a fallback.
+async function latestVersion() {
+    try {
+        const res = await fetchWithTimeout(`${RELEASES_URL}/download/version.json`, 10000);
+        if (res.ok) {
+            const v = String((await res.json()).version || '');
+            if (/^\d+\.\d+\.\d+$/.test(v)) return v;
+        }
+    } catch (e) { /* try the API */ }
+    const res = await fetchWithTimeout(`https://api.github.com/repos/${REPO}/releases/latest`, 10000);
+    if (!res.ok) return null;
+    const m = String((await res.json()).tag_name || '').match(/(\d+\.\d+\.\d+)/);
+    return m ? m[1] : null;
+}
+
 // Returns { version } when a newer release exists, null when up to date or GitHub can't be reached.
 async function check() {
     if (!exePath()) return null;
     try {
-        // …/releases/latest redirects to …/releases/tag/vX.Y.Z (no API rate limits this way).
-        const res = await fetchWithTimeout(RELEASES_URL, 10000);
-        const m = res.url.match(/\/releases\/tag\/v?(\d+\.\d+\.\d+)/);
-        if (!m) return null;
-        return isNewer(m[1], app.getVersion()) ? { version: m[1] } : null;
+        const latest = await latestVersion();
+        return latest && isNewer(latest, app.getVersion()) ? { version: latest } : null;
     } catch (e) {
         return null;
     }

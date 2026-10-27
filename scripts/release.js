@@ -46,10 +46,13 @@ const dist = path.join(root, 'dist');
 const assets = [
     path.join(dist, 'DipaCableNetworkFTP-Portable.exe'),
     path.join(dist, 'DipaCableNetworkFTP-iPhone.js'),
-    path.join(dist, 'DipaCableNetworkFTP-iPhone-Starter.js')
+    path.join(dist, 'DipaCableNetworkFTP-iPhone-Starter.js'),
+    path.join(dist, 'version.json')
 ];
 fs.copyFileSync(path.join(root, 'ios', 'Movie Fetcher.js'), assets[1]);
 fs.copyFileSync(path.join(root, 'ios', 'Starter.js'), assets[2]);
+// The installed apps read this to see whether they need to update.
+fs.writeFileSync(assets[3], JSON.stringify({ version: pkg.version }) + '\n');
 for (const a of assets) if (!fs.existsSync(a)) throw new Error('Missing build output: ' + a);
 
 // 3. Commit, tag and push.
